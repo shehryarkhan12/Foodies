@@ -1,0 +1,6 @@
+{
+  "name": "Foodies",
+  "android": {
+    "package": "com.mycompany.foodies_hub"
+  }
+}
