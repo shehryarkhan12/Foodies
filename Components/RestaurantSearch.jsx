@@ -233,13 +233,17 @@ const getMatchingMenuUrl = (searchTerm) => {
 
 const handleMenuButtonClick = async (item,lati,longi) => {
   let menuCategory = '';
-  let menuSection = item.section || 'All';
-  if (item.name.toLowerCase().includes('pizza')) {
+  
+  if (item.name.includes('pizza')||item.name.includes('Pizza')) {
     menuCategory = 'Pizza';
-  } else if (item.name.toLowerCase().includes('burger')) {
+    console.log("Fetching Pizza menu"); // Debugging statement
+  } else if (item.name.includes('burger')||item.name.includes('Burger')) {
     menuCategory = 'Burger';
-  } else if (item.name.toLowerCase().includes('bbq')) {
+  } else if (item.name.includes('BBQ')||item.name.includes('bbq')) {
     menuCategory = 'BBQ';
+  } 
+  else if (item.name.includes('Biryani')||item.name.includes('biryani')) {
+    menuCategory = 'Biryani';
   } 
 
   // If no keyword matches, set menuCategory to 'All' or keep it empty
@@ -249,7 +253,9 @@ const handleMenuButtonClick = async (item,lati,longi) => {
   }
 
   try {
-    const menuData = await fetchMenuFromServer(menuCategory, menuSection);
+    console.log(`Fetching menu for category: ${menuCategory}`); // Debugging statement
+    const menuData = await fetchMenuFromServer(menuCategory);
+    //console.log("Menu Data:", JSON.stringify(menuData, null, 2));
     NavigateToMenuScreen(menuData,lati,longi);
     //console.log(menuData);
   } catch (error) {
@@ -259,6 +265,7 @@ const handleMenuButtonClick = async (item,lati,longi) => {
 
 
 const NavigateToMenuScreen = (menuData,lati,longi)=>{
+  console.log("Navigating to MenuScreen with data:", menuData); // Debugging statement
   navigation.navigate('MenuScreen', { menuData: menuData,lati:lati,longi:longi });
 }
 
@@ -361,7 +368,7 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
           
         }))
         .filter(restaurant => restaurant.contactDetails && restaurant.contactDetails.phone);  // Filtering step added here
-        console.log("Fetched Restaurants:", restaurants);
+        //console.log("Fetched Restaurants:", restaurants);
         setResults(restaurants);
         resolve(restaurants);
       } else {
@@ -603,15 +610,15 @@ const topRatedRestaurants = [...results]
   
   
 
-  const fetchMenuFromServer = async (menuCategory, menuSection = 'All') => {
+  const fetchMenuFromServer = async (menuCategory) => {
     try {
       // Include the section in the query string if it is not 'All'
-      const sectionQuery = menuSection !== 'All' ? `&section=${menuSection}` : '';
-      const response = await axios.get(`http://${API_IP_ADDRESS}/menus?category=${menuCategory}${sectionQuery}`);
+      //const sectionQuery = menuSection !== 'All' ? `&section=${menuSection}` : '';
+      const response = await axios.get(`http://${API_IP_ADDRESS}/menus?category=${menuCategory}`);
       if (response.data) {
         return response.data;
       } else {
-        console.warn('No menu data found for the category and section');
+        console.warn('No menu data found for the category');
         return null;
       }
     } catch (error) {

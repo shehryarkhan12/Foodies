@@ -1158,24 +1158,25 @@ app.post('/getToken', async (req, res) => {
 
 
 app.get('/menus', async (req, res) => {
-    const { category, section } = req.query;
+    const { category } = req.query;
 
     try {
-      let query = {};
-      if (category && category !== 'All') {
-        query.category = category;
-      }
-      if (section && section !== 'All') {
-        query.section = section;
-      }
+        let query = {};
 
-      const menus = await Menu.find(query); // Fetch menus based on the query
+        // If category is specified and not 'All', filter by category name
+        if (category && category !== 'All') {
+            query.name = { $regex: new RegExp(category, 'i') }; // Case-insensitive match
+        }
 
-      res.status(200).json(menus);
+        const categories = await Menu.find(query); // Assuming Menu model has documents per category
+
+        res.status(200).json(categories);
     } catch (error) {
-      res.status(500).json({ error: 'An error occurred' });
+        console.error('Error fetching menu:', error);
+        res.status(500).json({ error: 'An error occurred' });
     }
 });
+
 
 
 app.get('/search', async (req, res) => {

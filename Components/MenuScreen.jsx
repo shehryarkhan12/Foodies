@@ -16,6 +16,7 @@ import axios from "axios";
 import { useRoute } from "@react-navigation/native";
 import { API_IP_ADDRESS } from "../api/config";
 import * as Device from 'expo-device';
+import { throttle } from 'lodash';
 
 
 const MenuScreen = ( ) => {
@@ -348,7 +349,7 @@ const menuDataMap = useMemo(() => {
   return map;
 }, [menuData]); // Recompute only if menuData changes
 
-const handleQuantityChange = useCallback((itemName, change) => {
+const handleQuantityChange = useCallback(throttle((itemName, change) => {
   // Get the price for the item directly from the map
   const itemPrice = menuDataMap[itemName];
 
@@ -386,7 +387,7 @@ const handleQuantityChange = useCallback((itemName, change) => {
       return newSubtotal;
     });
   }, 0);
-}, [selectedItems, setSelectedItems, setSubtotal, menuDataMap]);
+}, 500), [selectedItems, setSelectedItems, setSubtotal, menuDataMap,setImmediateQuantities,immediateQuantities]); // 500ms throttle
 
     
       
@@ -616,7 +617,7 @@ const handleQuantityChange = useCallback((itemName, change) => {
         <View style={{ flexDirection: 'row', position: 'relative' }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.filterScroll}>
             <View style={styles.filterContainer}>
-                <FilterButton title="All" isSelected={true} />
+                <FilterButton title="All" isSelected={false} />
                 <FilterButton title="Burgers" isSelected={false} />
                 <FilterButton title="Pizza" isSelected={false} />
                 <FilterButton title="BBQ" isSelected={false} />
