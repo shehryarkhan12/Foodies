@@ -22,6 +22,7 @@ const MenuScreen = ( ) => {
   const [orders,setOrders] = useState([]);
   const[data,setData]=useState([]);
   const [query, setQuery] = useState('');
+  const [immediateQuantities, setImmediateQuantities] = useState({});
   const route = useRoute();
   let lati = route.params?.lati;
   let longi = route.params?.longi;
@@ -357,14 +358,20 @@ const handleQuantityChange = useCallback((itemName, change) => {
   }
 
   // Update selected items immediately for faster UI response
-  setSelectedItems(prevItems => {
-    const currentQuantity = prevItems[itemName]?.[0] || 0;
+  setImmediateQuantities(prevQuantities => {
+    const currentQuantity = prevQuantities[itemName] || 0;
     const newQuantity = Math.max(currentQuantity + change, 0);
-    return { ...prevItems, [itemName]: [newQuantity, menuDataMap[itemName]] };
+    return { ...prevQuantities, [itemName]: newQuantity };
   });
 
-  // Update subtotal asynchronously to avoid UI delay
+  // Defer the update of selectedItems and subtotal to avoid UI block
   setTimeout(() => {
+    setSelectedItems(prevItems => {
+      const currentQuantity = prevItems[itemName]?.[0] || 0;
+      const newQuantity = Math.max(currentQuantity + change, 0);
+      return { ...prevItems, [itemName]: [newQuantity, menuDataMap[itemName]] };
+    });
+
     setSubtotal(prevSubtotal => {
       // Filter out the current item to update
       let newSubtotal = prevSubtotal.filter(item => item.name !== itemName);
@@ -380,7 +387,6 @@ const handleQuantityChange = useCallback((itemName, change) => {
     });
   }, 0);
 }, [selectedItems, setSelectedItems, setSubtotal, menuDataMap]);
-
 
     
       
@@ -556,6 +562,15 @@ const handleQuantityChange = useCallback((itemName, change) => {
     //     };
         
     // }, [prices]);
+    useEffect(() => {
+      // Update the local state to reflect the latest quantities in selectedItems
+      const updatedQuantities = {};
+      for (const itemName in selectedItems) {
+        updatedQuantities[itemName] = selectedItems[itemName][0];
+      }
+      setImmediateQuantities(updatedQuantities);
+    }, [selectedItems]);
+
 
     useEffect(() => {
       // Find out the current route name
@@ -649,7 +664,7 @@ const handleQuantityChange = useCallback((itemName, change) => {
                   <TouchableOpacity style={styles.quantityButton} onPress={() => handleQuantityChange(item.name, -1)}>
                     <Text style={styles.quantityButtonText}>-</Text>
                   </TouchableOpacity>
-                  <Text style={styles.quantity}>{selectedItems[item.name]?.[0] || 0}</Text>
+                  <Text style={styles.quantity}>{immediateQuantities[item.name] || 0}</Text>
 
                   <TouchableOpacity style={styles.quantityButton} onPress={() => handleQuantityChange(item.name, 1)}>
                     <Text style={styles.quantityButtonText}>+</Text>
