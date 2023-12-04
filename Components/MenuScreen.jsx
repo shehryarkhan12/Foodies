@@ -15,6 +15,7 @@ import { useNavigationState } from '@react-navigation/native';
 import axios from "axios";
 import { useRoute } from "@react-navigation/native";
 import { API_IP_ADDRESS } from "../api/config";
+import * as Device from 'expo-device';
 
 
 const MenuScreen = ( ) => {
@@ -116,8 +117,40 @@ const MenuScreen = ( ) => {
         }
       }, []);
       
+      async function registerForPushNotifications() {
+        // Check if the device supports push notifications
+        if (!Device.isDevice) {
+          console.log('Must use physical device for Push Notifications');
+          return;
+        }
       
+        // Check for existing permissions
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+      
+        // Ask for permission if necessary
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+      
+        // Exit if permission is not granted
+        if (finalStatus !== 'granted') {
+          console.log('Failed to get push token for push notification!');
+          return;
+        }
+      
+        // Get the token that uniquely identifies this device
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        console.log('Push notification token:', token);
+      
+        // Here you might want to send the token to your backend
+        // sendPushTokenToServer(token);
+      
+        return token;
+      }
 
+      
       const sendOrderToRestaurant = useCallback(async () => {
         const orderId = generateRandomOrderId();
         const orderItemsKey = `selectedItems-${orderId}`;
@@ -473,30 +506,30 @@ const handleQuantityChange = useCallback((itemName, change) => {
     }, [orderPlaced, subtotal, selectedItems]); // Include all dependencies
   
   
-    //  
+     
     
-    // useEffect(() => {
-    //     registerForPushNotifications();
+    useEffect(() => {
+        registerForPushNotifications();
       
-    //     // This listener is triggered when a notification is received while the app is foregrounded
-    //     const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
-    //       console.log(notification);
+        // This listener is triggered when a notification is received while the app is foregrounded
+        const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+          console.log(notification);
 
-    //       // Handle your notification here...
-    //     });
+          // Handle your notification here...
+        });
       
-    //     // This listener is triggered when a user taps on or interacts with a notification (works when app is foregrounded, backgrounded, or killed)
-    //     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
-    //       console.log(response);
-    //       // Navigate or handle the notification response here...
-    //       // Handle your notification response here...
-    //     });
+        // This listener is triggered when a user taps on or interacts with a notification (works when app is foregrounded, backgrounded, or killed)
+        const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+          console.log(response);
+          // Navigate or handle the notification response here...
+          // Handle your notification response here...
+        });
       
-    //     return () => {
-    //       foregroundSubscription.remove();
-    //       responseSubscription.remove();
-    //     };
-    //   }, []);
+        return () => {
+          foregroundSubscription.remove();
+          responseSubscription.remove();
+        };
+      }, []);
 
      
 
