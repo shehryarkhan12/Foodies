@@ -117,39 +117,44 @@ const MenuScreen = ( ) => {
         }
       }, []);
       
-      async function registerForPushNotifications() {
-        // Check if the device supports push notifications
-        if (!Device.isDevice) {
-          console.log('Must use physical device for Push Notifications');
-          return;
+      const registerForPushNotifications = useCallback(async () => {
+        try {
+          // Check if the device supports push notifications
+          if (!Device.isDevice) {
+            console.log('Must use physical device for Push Notifications');
+            return null;
+          }
+      
+          // Check for existing permissions
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          let finalStatus = existingStatus;
+      
+          // Ask for permission if necessary
+          if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+          }
+      
+          // Exit if permission is not granted
+          if (finalStatus !== 'granted') {
+            console.log('Failed to get push token for push notification!');
+            return null;
+          }
+      
+          // Get the token that uniquely identifies this device
+          const token = (await Notifications.getExpoPushTokenAsync()).data;
+          console.log('Push notification token:', token);
+      
+          // Here you might want to send the token to your backend
+          // sendPushTokenToServer(token);
+      
+          return token;
+        } catch (error) {
+          console.error('Error during push notification registration:', error);
+          return null;
         }
-      
-        // Check for existing permissions
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-      
-        // Ask for permission if necessary
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-      
-        // Exit if permission is not granted
-        if (finalStatus !== 'granted') {
-          console.log('Failed to get push token for push notification!');
-          return;
-        }
-      
-        // Get the token that uniquely identifies this device
-        const token = (await Notifications.getExpoPushTokenAsync()).data;
-        console.log('Push notification token:', token);
-      
-        // Here you might want to send the token to your backend
-        // sendPushTokenToServer(token);
-      
-        return token;
-      }
-
+      }, []); // Add dependencies if any
+          
       
       const sendOrderToRestaurant = useCallback(async () => {
         const orderId = generateRandomOrderId();
@@ -351,27 +356,30 @@ const handleQuantityChange = useCallback((itemName, change) => {
     return;
   }
 
-  // Calculate the new quantity first
+  // Update selected items immediately for faster UI response
   setSelectedItems(prevItems => {
     const currentQuantity = prevItems[itemName]?.[0] || 0;
-    let newQuantity = Math.max(currentQuantity + change, 0);
-
-    const newItems = { ...prevItems, [itemName]: [newQuantity, itemPrice] };
-    return newItems;
+    const newQuantity = Math.max(currentQuantity + change, 0);
+    return { ...prevItems, [itemName]: [newQuantity, menuDataMap[itemName]] };
   });
 
-  setSubtotal(prevSubtotal => {
-    let newSubtotal = prevSubtotal.filter(item => item.name !== itemName);
-    const updatedQuantity = selectedItems[itemName]?.[0] || 0;
-    let newQuantity = Math.max(updatedQuantity + change, 0);
+  // Update subtotal asynchronously to avoid UI delay
+  setTimeout(() => {
+    setSubtotal(prevSubtotal => {
+      // Filter out the current item to update
+      let newSubtotal = prevSubtotal.filter(item => item.name !== itemName);
+      // Compute the new quantity
+      const updatedQuantity = selectedItems[itemName]?.[0] || 0;
+      let newQuantity = Math.max(updatedQuantity + change, 0);
 
-    if (newQuantity > 0) {
-      newSubtotal.push({ name: itemName, quantity: newQuantity, price: itemPrice });
-    }
-    return newSubtotal;
-  });
-}, [selectedItems, setSelectedItems, setSubtotal, menuDataMap]); // Include all dependencies
-
+      // Add updated item to the subtotal if the quantity is greater than 0
+      if (newQuantity > 0) {
+        newSubtotal.push({ name: itemName, quantity: newQuantity, price: menuDataMap[itemName] });
+      }
+      return newSubtotal;
+    });
+  }, 0);
+}, [selectedItems, setSelectedItems, setSubtotal, menuDataMap]);
 
 
     
