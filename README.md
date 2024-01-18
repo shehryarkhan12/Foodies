@@ -4,6 +4,21 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 >**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
 
+[Project Name]
+Description
+Brief description of what this project does and who it's for.
+
+Getting Started
+Prerequisites
+List of any software or environment setups required (e.g., Node.js, Expo CLI).
+Instructions for installing these prerequisites.
+Installation
+Step-by-step guide on how to get a development environment running:
+
+
+Install NPM packages
+npm install
+Running the App
 ## Step 1: Start the Metro Server
 
 First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
@@ -11,16 +26,26 @@ First, you will need to start **Metro**, the JavaScript _bundler_ that ships _wi
 To start Metro, run the following command from the _root_ of your React Native project:
 
 ```bash
-# using npm
-npm start
+Instructions on how to run the app in development mode:
+npx expo start
 
-# OR using Yarn
-yarn start
-```
+To start the server:
+node server.mjs
+
+
+
+License
+Include information about the project's license.
+
+Contact
+Your Name - [@your_twitter](https://twitter.com/Shahrya20964373)
+
+Project Link: [https://github.com/your_username/repo_name](https://github.com/shehryarkhan12/Foodies)
+
 
 ## Step 2: Start your Application
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ app:
 
 ### For Android
 
@@ -32,15 +57,6 @@ npm run android
 yarn android
 ```
 
-### For iOS
-
-```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
 
 If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
 
@@ -50,14 +66,12 @@ This is one way to run your app — you can also run it directly from within And
 
 Now that you have successfully run the app, let's modify it.
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
+1. Open `App.jsx` in your text editor of choice and edit some lines.
 2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
 
 ## Congratulations! :tada:
 
-You've successfully run and modified your React Native App. :partying_face:
+You've successfully run and modified your React Native Expo App. :partying_face:
 
 ### Now what?
 
