@@ -3,8 +3,8 @@ import { View, Text, Switch, StyleSheet, SafeAreaView, TouchableOpacity, Image }
 import { useTheme } from './ThemeContext';
 const Settings = ({ navigation }) => {
   // State variables for the switches
-  const [isNotificationsMuted, setNotificationsMuted] = useState(false);
-  const { isDarkMode, toggleTheme } = useTheme();
+
+  const { isDarkMode, toggleTheme, isNotificationsMuted, toggleNotifications } = useTheme();
 
   // Function to handle back button press
   const handleBackPress = () => {
@@ -28,7 +28,7 @@ const Settings = ({ navigation }) => {
         <Text style={[styles.settingText, isDarkMode ? styles.darkSettingText : {}]}>Mute notifications</Text>
         <Switch
           value={isNotificationsMuted}
-          onValueChange={() => setNotificationsMuted(!isNotificationsMuted)}
+          onValueChange={toggleNotifications}
         />
       </View>
       <View style={[styles.settingRow, isDarkMode ? styles.darkSettingRow : styles.border]}>

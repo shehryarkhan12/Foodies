@@ -1,8 +1,8 @@
 import React, { useState,useEffect,useContext,useMemo,useCallback } from "react";
 import SmsAndroid from 'react-native-sms';
-import { View, Text, Button, Alert, FlatList, TouchableOpacity,StyleSheet,Image,ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Button, Alert, FlatList, TouchableOpacity,StyleSheet,Image,ScrollView, ActivityIndicator,ImageBackground } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNotification } from './NotificationContext';
 import { ItemsContext } from './ItemsContext';
 import { usePrice } from './PriceContext';
 import { priceUpdateEmitter } from './EventEmitter';
@@ -17,17 +17,26 @@ import { useRoute } from "@react-navigation/native";
 import { API_IP_ADDRESS } from "../api/config";
 import * as Device from 'expo-device';
 import { throttle } from 'lodash';
+import CardLoader from './CardLoader';
+import { useNavigation } from '@react-navigation/native';
+import { useNotification } from '../Components/NotificationContext';
+
 
 
 const MenuScreen = ( ) => {
+  const navigation = useNavigation();
+  const [setNotifications, notifications,notificationCount, setNotificationCount, incrementNotificationCount] = useNotification();
   const [orders,setOrders] = useState([]);
   const[data,setData]=useState([]);
   const [query, setQuery] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [immediateQuantities, setImmediateQuantities] = useState({});
   const route = useRoute();
   let lati = route.params?.lati;
   let longi = route.params?.longi;
-  //console.log(typeof(lati));
+  
+  let id_ = route.params?.token;
+  console.log("Token00:",id_);
   //console.log(longi);
     // useEffect( async ()=>{
         
@@ -45,7 +54,7 @@ const MenuScreen = ( ) => {
         fetch(`http://${API_IP_ADDRESS}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: 'shahryarinam34@gmail.com', password: 'sp20bcs014' }),
+            body: JSON.stringify({ email: 'shahryarinam34@gmail.com', password: 'sheh0325' }),
         })
         .then(response => response.json())
         .then(data => {
@@ -53,7 +62,7 @@ const MenuScreen = ( ) => {
         })
         .catch(error => console.error('Error:', error));
     }, []);
-    //console.log("token=",token);
+    console.log("token=",token);
     //const [subtotal, setSubtotal] = useState([]);
     //const [selectedItems,setSelectedItems]= useState({});
     const { menuData } = route.params;
@@ -67,7 +76,7 @@ const MenuScreen = ( ) => {
 
    
     const { phoneNumber } = route.params; // Receive the phone number here
-    const { setNotifications } = useNotification();
+  
     const isFocused = useIsFocused();
 
     useEffect(() => {
@@ -144,7 +153,9 @@ const MenuScreen = ( ) => {
           }
       
           // Get the token that uniquely identifies this device
-          const token = (await Notifications.getExpoPushTokenAsync()).data;
+          const token = (await Notifications.getExpoPushTokenAsync({
+            experienceId: '0d53d6ad-d49d-42ea-a76c-beea06e9ceed', // Replace with your actual project ID
+          })).data;
           console.log('Push notification token:', token);
       
           // Here you might want to send the token to your backend
@@ -249,21 +260,21 @@ const MenuScreen = ( ) => {
 // }, [selectedItems, subtotal]);
   
 
-useEffect(() => {
-  // Introduce a delay
-  const timer = setTimeout(() => {
-      // Your existing code inside useEffect
-      const fetchOrderItems = () => {
-          // Update the subtotal state
-          setSubtotal([{name:"LOBSTER BISQUE", price: 1234,quantity:1 }]); // Assuming subtotal should be an array of objects
-      };
+// useEffect(() => {
+//   // Introduce a delay
+//   const timer = setTimeout(() => {
+//       // Your existing code inside useEffect
+//       const fetchOrderItems = () => {
+//           // Update the subtotal state
+//           setSubtotal([{name:"LOBSTER BISQUE", price: 1234,quantity:1 }]); // Assuming subtotal should be an array of objects
+//       };
 
-      fetchOrderItems();
-  }, 90000); // Delay of 3000 milliseconds (3 seconds)
+//       fetchOrderItems();
+//   }, 90000); // Delay of 3000 milliseconds (3 seconds)
 
-  // Clear the timer when the component unmounts or when the dependencies change
-  return () => clearTimeout(timer);
-}, [selectedItems,subtotal]); // Dependencies remain the same
+//   // Clear the timer when the component unmounts or when the dependencies change
+//   return () => clearTimeout(timer);
+// }, [selectedItems,subtotal]); // Dependencies remain the same
 
 // useEffect(() => {
 //   console.log("Selected Items after update:", selectedItems);
@@ -456,12 +467,57 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
       
 
     //console.log("selected Items after handle quantity change:",selectedItems);
-    
 
+
+    useEffect(() => {
+      // Fetch userEmail from AsyncStorage
+      const fetchUserEmail = async () => {
+          try {
+              const storedUserEmail = await AsyncStorage.getItem('userEmail');
+              if (storedUserEmail) {
+                  setUserEmail(storedUserEmail);
+                  console.log("UserEmail in MenuScreen:",userEmail);
+              }
+          } catch (error) {
+              console.error("Failed to fetch userEmail from storage:", error);
+          }
+      };
+      
+      fetchUserEmail();
+    }, [userEmail]);
+    
+    const sendOrderConfirmationNotification = async () => {
+      const title = "Order Confirmation";
+      const body = `Your order with ID ${id_} has been placed successfully`;
+      const data = {}; // Add any additional data if needed
+      const recipientEmail = userEmail; // Use the email of the currently logged-in user
+      console.log("userEmail in sendOrderConfirmationNotification: ",userEmail);
+  
+      try {
+          const response = await fetch(`http://${API_IP_ADDRESS}/triggerNotification`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ title, body, data, recipientEmail })
+              
+          });
+          if (response.ok) {
+            incrementNotificationCount(); // Increment notification count
+            console.log("NotificationCount in MenuScreen:",notificationCount);
+            console.log("Notification sent to user.");
+        }
+      } catch (error) {
+          console.error("Error triggering notification:", error);
+          // Handle error scenario
+      }
+  };
+  
     const placeOrder = useCallback(async () => {
       if (orderPlaced) {
           if (subtotal && subtotal.length > 0) {
-              Alert.alert("Order placed Successfully", `Your order Id is ${orderId}`);
+             // Alert.alert("Order placed Successfully", `Your order Id is ${orderId}`);
+              navigation.navigate("PaymentScreen");
           } else {
               Alert.alert("Error", "Prices not fetched by the restaurant yet");
           }
@@ -476,6 +532,7 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
               {
                   text: 'OK', onPress: async () => {
                       setLoading(true); // Start loading animation
+
                       const itemsArray = Object.values(selectedItems);
                       console.log("ItemArray=",itemsArray);
                       // Iterate over the object's values if selectedItems is an object
@@ -488,8 +545,9 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
                               price: itemDetails[1],    // Access the second element of the array for price
                               lati:lati,
                               longi:longi,
-                              token:token
+                              token:id_
                             };
+                            console.log("token11:",orderItem.token);
                             console.log('Adding item to order:', { name: itemName, ...itemDetails });
                             await addItemToOrder(orderItem);
                           } catch (error) {
@@ -512,8 +570,12 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
   
                       // Assuming sendOrderToRestaurant is another function that finalizes the order
                       await sendOrderToRestaurant();
-                      setLoading(false); // Stop loading animation
+                     
                       setOrderPlaced(true); // Update the state to indicate the order is placed
+                      await sendOrderConfirmationNotification(orderId, incrementNotificationCount);
+                      
+                      setLoading(false); // Stop loading animation
+                      navigation.navigate("PaymentScreen");
                   }
               },
           ]
@@ -521,6 +583,26 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
     }, [orderPlaced, subtotal, selectedItems]); // Include all dependencies
   
   
+    const MenuItem = React.memo(({ item, onQuantityChange, quantity }) => (
+      <View style={styles.itemContainer}>
+        <Image source={{ uri: item.imageUrl }} style={styles.image} />
+        <View style={styles.itemDetailsContainer}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          <Text style={styles.itemDescription}>{item.description}</Text>
+          <Text style={styles.itemPrice}>{`${item.price}Rs`}</Text>
+        </View>
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity style={styles.quantityButton} onPress={() => onQuantityChange(item.name, -1)}>
+            <Text style={styles.quantityButtonText}>-</Text>
+          </TouchableOpacity>
+          <Text style={styles.quantity}>{quantity}</Text>
+          <TouchableOpacity style={styles.quantityButton} onPress={() => onQuantityChange(item.name, 1)}>
+            <Text style={styles.quantityButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    ));
+    
      
     
     useEffect(() => {
@@ -577,8 +659,8 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
       // Find out the current route name
       const currentRouteName = currentRoutes[currentRoutes.length - 1].name;
       
-      // Check if the MenuScreen is not focused and the current route is not 'ConfirmOrder'
-      if (!isFocused && currentRouteName !== 'MenuScreen') {
+     
+      if (!isFocused && currentRouteName !== 'MenuScreen' && currentRouteName !== 'PaymentScreen') {
           setSelectedItems({}); // Reset the selected items
           setSubtotal([]);      // Reset the subtotal
       }
@@ -588,7 +670,45 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
   // useEffect(() => {
   //   console.log('Selected items updated:', selectedItems);
   // }, [selectedItems]);
-      
+
+  const flattenMenuData = (menus) => {
+    let flatData = [];
+    menus.forEach(menu => {
+      if (menu.categories && Array.isArray(menu.categories)) {
+        menu.categories.forEach(category => {
+          category.items.forEach(item => {
+            flatData.push({ ...item, categoryName: category.name });
+          });
+        });
+      }
+    });
+    return flatData;
+  };
+  
+  
+  
+  // Assuming menuData might not be immediately available or its structure might vary
+  const flatMenuData = useMemo(() => {
+    // Check if menuData is defined and is an array
+    return Array.isArray(menuData) ? flattenMenuData(menuData) : [];
+  }, [menuData]);
+  
+  // Remove the ScrollView surrounding the filters and use a horizontal FlatList for the filters
+  const renderFilter = ({ item }) => (
+    <FilterButton title={item.title} isSelected={item.isSelected} />
+  );
+
+  // Main content render function for the FlatList
+  const renderItem = ({ item }) => {
+    
+    return (
+      <MenuItem
+        item={item}
+        onQuantityChange={handleQuantityChange}
+        quantity={immediateQuantities[item.name] || 0}
+      />
+    );
+  };
       
 
     const safeMultiply = (a, b) => {
@@ -611,20 +731,40 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
     }, [subtotal]);
 
     //console.log('menuData', menuData);
+
+     // Calculate the total count of items
+  const itemCount = Object.values(selectedItems).reduce((total, [quantity]) => total + quantity, 0);
     
     return (
-        <View style={{ flex: 1 }}> 
-        <View style={{ flexDirection: 'row', position: 'relative' }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.filterScroll}>
-            <View style={styles.filterContainer}>
-                <FilterButton title="All" isSelected={false} />
-                <FilterButton title="Burgers" isSelected={false} />
-                <FilterButton title="Pizza" isSelected={false} />
-                <FilterButton title="BBQ" isSelected={false} />
-                <FilterButton title="Biryani" isSelected={false} />
+      <>
+        {/* Top Navigation Bar */}
+        
+        <View style={styles.topNavBar}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <ImageBackground source={require('../Images/arrow-left.png')} style={styles.leftArrowStyle} resizeMode="contain" />
+            </TouchableOpacity>
+            <Text style={styles.navBarTitle}>Menu</Text>
+           {/* Cart Icon with Badge */}
+        <TouchableOpacity style={styles.cartIconContainer} onPress={() => {/* Navigate to cart screen */}}>
+        <Ionicons name="cart" size={34} color="#1E90FF" />
+          {itemCount > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{itemCount}</Text>
             </View>
-            
-        </ScrollView>
+          )}
+        </TouchableOpacity>
+        </View>
+        
+       {/* Horizontal Filter Bar */}
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        data={[ /* array of filters like { title: 'All', isSelected: activeFilter === 'All' }, etc. */ ]}
+        renderItem={renderFilter}
+        keyExtractor={(item, index) => `filter-${index}`}
+        style={styles.filterScroll}
+      />
+       
         <LinearGradient
         colors={['rgba(245, 252, 255, 0)', 'rgba(245, 252, 255, 1)']}
         style={styles.gradientLeft}
@@ -636,46 +776,26 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
         pointerEvents="none" // Important to ensure that the gradient does not interfere with user interaction
     />
 
-        </View>
+       
 
-        <ScrollView style={styles.container}>
-             
-            {
-    loading && (
-        <View style={styles.loadingModal}>
-            <ActivityIndicator size="large" color="#0000ff" />
-            <Text style={styles.loadingText}>Fetching prices...</Text>
-        </View>
-    )
-}
+        <View style={styles.container}>
+            
 
-{menuData.map((menu, menuIndex) => (
-        menu.categories.map((category, categoryIndex) => (
-          <View key={`category-${category._id}-${categoryIndex}`}>
-            <Text style={styles.categoryTitle}>{category.name}</Text>
-            {category.items.map((item, itemIndex) => (
-              <View key={`item-${item._id}-${itemIndex}`} style={styles.itemContainer}>
-                <Image source={{ uri: item.imageUrl }} style={styles.image} />
-                <View style={styles.itemDetailsContainer}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemDescription}>{item.description}</Text>
-                  <Text style={styles.itemPrice}>{`${item.price}Rs`}</Text>
-                </View>
-                <View style={styles.buttonsContainer}>
-                  <TouchableOpacity style={styles.quantityButton} onPress={() => handleQuantityChange(item.name, -1)}>
-                    <Text style={styles.quantityButtonText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.quantity}>{immediateQuantities[item.name] || 0}</Text>
-
-                  <TouchableOpacity style={styles.quantityButton} onPress={() => handleQuantityChange(item.name, 1)}>
-                    <Text style={styles.quantityButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        ))
-      ))}
+        <FlatList
+  data={flatMenuData} // Use the flattened menu data here
+  renderItem={renderItem}
+  keyExtractor={(item) => item._id.toString()}
+        extraData={immediateQuantities}
+        ListFooterComponent={() => (
+          // This will render at the bottom of the list
+          loading ? (
+            <View style={styles.loadingModal}>
+              <ActivityIndicator size="large" color="#0000ff" />
+              <Text style={styles.loadingText}>Fetching Prices from Restaurant...</Text>
+            </View>
+          ) : null
+        )}
+      />
             {/* Subtotal display */}
             {showSubtotal && Object.keys(selectedItems)?.length > 0 && subtotal.length > 0 && (
                 <View style={styles.subtotalContainer}>
@@ -688,9 +808,12 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
                     <Text style={styles.total}>Total: {totalCost.toFixed(2)}Rs</Text>
                 </View>
             )}
-            <Button title="Place Order" onPress={placeOrder} color="#FF6347" />
-        </ScrollView>
+           <TouchableOpacity onPress={placeOrder} style={styles.placeOrderButton}>
+    <Text style={styles.placeOrderButtonText}>Proceed to Pay</Text>
+</TouchableOpacity>
         </View>
+        
+        </>
     );
     
 };
@@ -698,12 +821,37 @@ const handleQuantityChange = useCallback(throttle((itemName, change) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5FCFF',
+        backgroundColor: '#FFF',
     },
+    topNavBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#FFF',
+      paddingHorizontal: 10,
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#FFF',
+      zIndex: 5, // Ensure this is less than the cart icon's zIndex
+    },
+    backButtonContainer: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      zIndex: 1,
+  },
+  leftArrowStyle: {
+      width: 40,  // Adjust size as needed
+      height: 40,
+  },
     filterScroll: {
         flexGrow: 0, // This ensures that the ScrollView doesn't expand beyond its content
-        backgroundColor: '#F5FCFF',
+        backgroundColor: '#FFF',
     },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+  },
     itemContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -714,11 +862,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     filterContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-evenly',
-        marginVertical: 10,
-        paddingHorizontal: 10,
-    },
+      flexDirection: 'row',
+      justifyContent: 'space-evenly',
+      paddingVertical: 10,  // Adjust vertical padding as necessary
+      paddingHorizontal: 10,
+  },
 
     buttonsContainer: {
         flexDirection: 'row',  // To lay out buttons horizontally.
@@ -726,6 +874,36 @@ const styles = StyleSheet.create({
         alignItems: 'center',  // Center the buttons vertically.
         marginVertical: 10,  // Space above and below the container.
     },
+    backButton: {
+      marginRight: 15, // Space between the back button and the title
+  },
+  navBarTitle: {
+    fontSize: 25,
+    fontWeight: 'bold',
+    color:'red'
+    // Adjust other styling as needed
+},
+cartIconContainer: {
+  marginLeft: 'auto', // Pushes the icon to the right
+  position: 'relative',
+  zIndex: 10, // Adjust as needed
+},
+cartBadge: {
+  position: 'absolute',
+  right: -6,
+  top: -3,
+  backgroundColor: 'red',
+  borderRadius: 10,
+  width: 20,
+  height: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+cartBadgeText: {
+  color: 'white',
+  fontSize: 12,
+  fontWeight: 'bold',
+},
     plusButton: {
         marginRight: 5,  // Space to the right of the "+" button.
         padding: 5,  // Padding for the button.
@@ -833,6 +1011,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex:1500
     },
     orderButton: {
         padding: 10,
@@ -860,6 +1039,27 @@ const styles = StyleSheet.create({
         width: 30,
         zIndex: 1,
     },
+    placeOrderButton: {
+      backgroundColor: '#FF6347', // Same color as your original button
+      paddingVertical: 15,
+      paddingHorizontal: 20,
+      borderRadius: 5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginVertical: 20, // Adjust as needed for spacing
+      marginHorizontal: 10, // Adjust for horizontal spacing
+      elevation: 2, // For Android shadow
+      shadowColor: '#000', // For iOS shadow
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      zIndex:1000
+  },
+  placeOrderButtonText: {
+    color: '#FFFFFF', // White text color
+    fontSize: 18,
+    fontWeight: 'bold',
+},
     loadingText: {
         marginTop: 20,
         fontSize: 18,

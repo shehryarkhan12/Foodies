@@ -21,37 +21,40 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Linking, Alert, AsyncStorage } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
-import * as Facebook from 'expo-facebook';
 
 const StartScreen = () => {
     const navigation = useNavigation();
 
-    useEffect(() => {
-        async function initializeFacebook() {
-            if (Facebook && Facebook.initializeAsync) {
-                await Facebook.initializeAsync({appId: '839998817606915'});
-            }
-        }
-        initializeFacebook();
-    }, []);
-
-    // Your existing logic for login
-    const handleFacebookLogin = async () => {
-        try {
-            const { type, token } = await Facebook.logInWithReadPermissionsAsync({
-                permissions: ['public_profile', 'email'],
-            });
-
-            if (type === 'success') {
-                await AsyncStorage.setItem('token', token);
-                await AsyncStorage.setItem('loginMethod', 'facebook');
-                Alert.alert('Logged in with Facebook!');
-                navigation.navigate('Profile');
-            }
-        } catch ({ message }) {
-            console.log(`Facebook Login Error: ${message}`);
-        }
-    };
+    // const signInWithFB = async () => {
+    //     // Attempt login with permissions
+    //     const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
+    //     if (result.isCancelled) {
+    //       throw 'User cancelled the login process';
+    //     }
+    //     // Once signed in, get the users AccesToken
+    //     const data = await AccessToken.getCurrentAccessToken();
+    //     if (!data) {
+    //       throw 'Something went wrong obtaining access token';
+    //     }
+        
+    //      const auth = getAuth(app);
+    
+    //     // Create a Firebase credential with the AccessToken
+    //     const facebookAuthProvider = FacebookAuthProvider.credential(data.accessToken);
+    //     // console.log("provider ",facebookAuthProvider);
+    //     // const credential = facebookAuthProvider.credential(data.accessToken);
+    //     // Sign-in with credential from the Facebook user.
+    //     signInWithCredential(auth, facebookAuthProvider)
+    //     .then(() => {
+    
+    //     })
+    //     .catch(error => {
+    //       // Handle Errors here.]
+    //       console.log(error);
+    //     });
+    
+    
+    //   }
 
     const handleEmailLogin = () => {
         navigation.navigate('Login');
@@ -84,37 +87,30 @@ const StartScreen = () => {
         <View style={styles.container}>
             <Text style={styles.title}>Foodies Hub</Text>
             <Image source={require('../Images/delicious-fried-chicken-plate-1.png')} style={styles.image} />
-            <TouchableOpacity style={styles.googleButton} >
-            <Image source={require('../Images/google.png')} style={styles.icon} />
-                <Text style={styles.buttonText}>Continue with Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.facebookButton} onPress={handleFacebookLogin} > 
-            <Image source={require('../Images/download.png')} style={styles.icon} />
-                <Text style={styles.buttonText}>Continue with Facebook</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.emailButton} onPress={handleEmailLogin}> 
             <Image source={require('../Images/gmail.png')} style={styles.icon} />
                 <Text style={styles.buttonText}>Continue with Email</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.emailButton} onPress={handleRestaurantEmailLogin}> 
             <Image source={require('../Images/gmail.png')} style={styles.icon} />
-                <Text style={styles.buttonText}>Continue with RestaurantAdmin Email</Text>
+                <Text style={styles.buttonText}>Continue as Restaurant Admin</Text>
             </TouchableOpacity>
-            <View style={styles.footer}>
-                <Text>By Continuing you agree to</Text>
-                <Text> </Text>
-                <Text style={styles.link} onPress={() => handleLinkPress('Privacy Policy')}>
-            Privacy Policy
-        </Text>
-                <Text> </Text>
-                <Text style={styles.link} onPress={() => handleLinkPress('Terms & Conditions')}>
-            Terms & Conditions
-        </Text>
-                <Text> </Text>
-                <Text style={styles.link} onPress={() => handleLinkPress('Content Policy')}>
-                Content Policy
-        </Text>
-            </View>
+            <View style={styles.terms}>
+    <Text style={styles.terms}>By Continuing you agree to</Text>
+    <View style={styles.linkContainer}>
+        <TouchableOpacity onPress={() => {/* Handle Privacy Policy link click */}}>
+            <Text style={styles.linkText}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <Text>  </Text>
+        <TouchableOpacity onPress={() => {/* Handle Terms & Conditions link click */}}>
+            <Text style={styles.linkText}>Terms & Conditions</Text>
+        </TouchableOpacity>
+        <Text>  </Text>
+        <TouchableOpacity onPress={() => {/* Handle Content Policy link click */}}>
+            <Text style={styles.linkText}>Content Policy</Text>
+        </TouchableOpacity>
+    </View>
+</View>
         </View>
     );
 };
@@ -186,6 +182,21 @@ const styles = StyleSheet.create({
         color: 'red',
         textDecorationLine: 'underline',
     },
+    linkContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        
+    },
+    linkText: {
+        color: 'lightgrey',
+        textDecorationLine: 'underline',
+    },
+    terms: {
+        marginTop: 130,
+        alignItems: 'center',
+        color:'#827777',
+      },
     icon: {
         width: 30,  // You can adjust this
         height: 30, // And this too

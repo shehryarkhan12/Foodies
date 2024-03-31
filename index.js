@@ -6,11 +6,8 @@ import React, { useState, useEffect } from 'react';
 import { registerRootComponent } from 'expo';
 import App from './Components/App';
 import * as Font from 'expo-font';
-import * as Facebook from 'expo-facebook';
 
-Facebook.initializeAsync({
-  appId: '839998817606915',
-});
+
 
 //import { name as appName } from './app.json';
 

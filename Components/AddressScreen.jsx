@@ -6,7 +6,7 @@ const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
 import axios from 'axios';
 
-const GOOGLE_API_KEY = 'AIzaSyCYpQVzzCbBwlvAht3Mh6UlIrD_lwGsu5U';
+const GOOGLE_API_KEY = 'AIzaSyDu_ikrzuCSjDJh3h0LDoz79ooMNzbKxwc';
 
 // Helper function to validate address fields
 const isValidNumeric = (value) => /^\d+[\d\/\-]*$/.test(value);
@@ -403,9 +403,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: 'red', // assuming a black title
-    paddingVertical: 20,
-    fontFamily:"Fredoka",
-   
+    paddingVertical: 20, 
     borderBottomWidth: 1,
     borderBottomColor: '#ccc', // a light line under the title
     backgroundColor: '#f8f8f8', // a light grey background for the title bar

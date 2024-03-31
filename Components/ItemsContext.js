@@ -11,6 +11,10 @@ export const ItemsProvider = ({ children }) => {
         latitude: null,
         longitude: null,
       });
+      const [restaurantLocation, setRestaurantLocation] = useState({
+        latitude: null,
+        longitude: null,
+      });
       const [mapKey, setMapKey] = useState(1);
       const [token, setToken] = useState('');
 
@@ -26,7 +30,9 @@ export const ItemsProvider = ({ children }) => {
         mapKey,
         setMapKey,
         token,
-        setToken
+        setToken,
+        restaurantLocation,
+        setRestaurantLocation
     };
 
     return (

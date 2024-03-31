@@ -1,6 +1,41 @@
 {
-  "name": "Foodies",
-  "android": {
-    "package": "com.mycompany.foodies_hub"
+  "expo": {
+    "name": "Foodies",
+    "android": {
+      "package": "com.mycompany.foodies_hub",
+      "permissions": [
+       
+        "READ_CONTACTS",
+      "WRITE_CONTACTS",
+      "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-facebook",
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "839998817606915",
+          "clientToken": "9773523f3ad37a6dddd6a618b7257f41",
+          "displayName": "Foodies Hub"
+        }
+      ],
+      [
+        "@react-native-voice/voice"
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0d53d6ad-d49d-42ea-a76c-beea06e9ceed"
+      }
+    },
+    "owner": "shehryar22",
+    "slug": "foodieshub"
   }
 }

@@ -1,15 +1,22 @@
 
 import React, { useState,useEffect } from 'react';
-import { View, Text, TouchableOpacity, Linking, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, TextInput, StyleSheet,ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Alert } from 'react-native';
 import { ImageBackground } from 'react-native';
 import api from '../api/api';
 import * as Notifications from 'expo-notifications';
+import emailValidator from 'email-validator';
+import { API_IP_ADDRESS } from '../api/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
 const Register = () => {
   const navigation = useNavigation();
+
+  const [isUsernameValid, setUsernameValid] = useState(null);
+const [isEmailValid, setEmailValid] = useState(null);
 
   const [formData, setFormData] = useState({
     username: "",
@@ -18,25 +25,15 @@ const Register = () => {
     confirmPassword: "", // Added this
   });
 
-  const registerForPushNotificationsAsync = async () => {
-    let finalStatus = await checkNotificationStatus(); // Check or request permissions
-
-    if (finalStatus !== 'granted') {
-        Alert.alert('Failed to get push token for push notification!');
-        return;
+  const storeTokenLocally = async (token) => {
+    try {
+        await AsyncStorage.setItem('expoPushToken', token);
+    } catch (e) {
+        console.error('Failed to save the token to AsyncStorage', e);
     }
-
-    // Get the token that uniquely identifies this device
-    const token = (await Notifications.getExpoPushTokenAsync()).data; // This should be just a string
-
-    // Assume username is stored in your app state
-    const username = 'ShehryarKhan';
-
-    // POST the token to your backend server from where you can retrieve it to send push notifications.
-    return postTokenToServer(token, username);
 };
 
-const checkNotificationStatus = async () => {
+  const checkNotificationStatus = async () => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -48,15 +45,50 @@ const checkNotificationStatus = async () => {
     return finalStatus;
 };
 
-const getExpoPushTokenWithProjectId = async () => {
+  const getExpoPushTokenWithProjectId = async () => {
     // Replace 'your-project-id' with your actual Expo project ID
-    const projectId = 'foodies';
-    return (await Notifications.getExpoPushTokenAsync({ experienceId: projectId })).data;
+    const projectId = '0d53d6ad-d49d-42ea-a76c-beea06e9ceed';
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({ experienceId: projectId });
+    console.log("Retrieved Expo Push Token:", tokenResponse.data);
+    return tokenResponse.data;
 };
 
+
+  const registerForPushNotificationsAsync = async () => {
+    let finalStatus = await checkNotificationStatus(); // Check or request permissions
+
+    if (finalStatus !== 'granted') {
+        Alert.alert('Permission not granted.');
+        return;
+    }
+
+    // Get the token that uniquely identifies this device
+    const token = await getExpoPushTokenWithProjectId(); // This should be just a string
+    console.log("Token in registerForPushNotificationsAsync:", token);
+    if (!token) {
+        Alert.alert('Failed to get push token for push notification!');
+        return null;
+    }
+    // Assume username is stored in your app state
+    //const username = formData.username;
+    
+    if (token) {
+      console.log('Push Token to be sent:', token);
+      await storeTokenLocally(token);
+      return token; // Ensure to return the token
+      //await postTokenToServer(token, username);
+  } else {
+      console.log('Push token registration failed.');
+  }
+};
+
+
+
+
 const postTokenToServer = async (token, username) => {
+  console.log("Sending to server - Token:", token, "Username:", username);
   
-    await fetch('http://192.168.1.5:4000/saveExpoPushToken', {
+  const response = await fetch(`http://${API_IP_ADDRESS}/saveExpoPushToken`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -66,81 +98,224 @@ const postTokenToServer = async (token, username) => {
             username: username,
         }),
     });
+    const responseData = await response.json();
+    console.log("Response from server:", responseData);
+
+    if (!response.ok) {
+        console.log('Failed to save push token on server');
+    }
 };
 
-  const handleInputChange = (name, value) => {
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
+const handleInputChange = (name, value) => {
+  setFormData({
+    ...formData,
+    [name]: value,
+  });
+
+  if (name === "username") {
+    checkUsernameUnique(value);
+  } else if (name === "email") {
+    checkEmailUnique(value);
+  }
+};
+
+const checkUsernameUnique = async (username) => {
+  // Return early or set a default state if the username is empty
+  if (!username.trim()) {
+    setUsernameValid(null); // or set to true/false based on your logic
+    return;
+  }
+
+  try {
+    const response = await api.get(`/checkUsername/${username}`);
+    setUsernameValid(response.data.unique);
+  } catch (error) {
+    console.error("Error checking username uniqueness:", error);
+    setUsernameValid(false); // Handle the error as needed
+  }
+};
+
+
+  
+const checkEmailUnique = async (email) => {
+  // Return early or set a default state if the email is empty
+  if (!email.trim()) {
+    setEmailValid(null); // or set to true/false based on your logic
+    return;
+  }
+ 
+  try {
+    const response = await api.get(`/checkEmail/${email}`);
+    setEmailValid(response.data.unique); // Assuming the API returns 'unique' property
+  } catch (error) {
+    console.error("Error checking email uniqueness:", error);
+    setEmailValid(false); // Handle the error as needed
+  }
+};
+
+
+
+const handleSendCode = () => {
+  // Endpoint URL
+  console.log("Sending verification code for email:", formData.email);
+  const endpoint = `http://${API_IP_ADDRESS}/verify-email`;
+
+  // Making a POST request to the backend
+  fetch(endpoint, {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: formData.email }),
+  })
+  .then(response => response.json())
+  .then(data => {
+      if (data.success) {
+          Alert.alert(`Code sent to ${formData.email}`);
+
+      } else {
+          // Handle any errors or failures in sending the email
+          Alert.alert(data.message || "Failed to send code. Please try again.");
+      }
+  })
+  .catch(error => {
+      // Handle errors in the request itself
+      Alert.alert(error.toString());
+      console.error("There was an error sending the reset code:", error);
+  });
+};
+
+
+  useEffect(() => {
+    console.log("Current username validity state:", isUsernameValid);
+  }, [isUsernameValid]);
+  // const ValidatedTextInput = ({ value, onChangeText, placeholder, isValueValid }) => {
+  //   return (
+  //     <View style={styles.inputWithValidation}>
+  //       <TextInput
+  //         style={styles.input}
+  //         placeholder={placeholder}
+  //         placeholderTextColor="#aaa"
+  //         value={value}
+  //         onChangeText={onChangeText}
+  //       />
+  //       {isValueValid !== null && (
+  //         <Text style={styles.validationText}>
+  //           {isValueValid ? '✅' : '❌'}
+  //         </Text>
+  //       )}
+  //     </View>
+  //   );
+  // };
+  
 
   const handleRegister = async () => {
+    const { username, email, password, confirmPassword } = formData; // Destructure from formData
+    // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
       Alert.alert('Error', 'Passwords do not match!');
       return;
     }
+    // Check if all fields are filled
+  if (!username || !email || !password || !confirmPassword) {
+    Alert.alert('Error', 'Please fill in all fields.');
+    return;
+  }
+
+  // Check if username and email are valid
+  if (!isUsernameValid) {
+    Alert.alert('Error', 'Username is already taken.');
+    return;
+  }
+  if (!isEmailValid) {
+    Alert.alert('Error', 'Email is already in use.');
+    return;
+    
+  }
+   // Check if email format is valid
+   if (!emailValidator.validate(email)) {
+    setEmailValid(false); // Set to false as email format is invalid
+    Alert.alert('Invalid Email/Email do not Exist', 'Please enter a valid email address.');
+    return;
+  }
+
+  
     try {
-      // const pushToken = await registerForPushNotificationsAsync();
-      // if (!pushToken) {
-      //   // Handle the case where the user did not allow notifications
-      //   console.log('Push token registration failed.');
-      //   // Depending on your app's requirement you may want to alert the user or proceed with the registration without the push token.
-      // }
-  
-      const { username, email, password } = formData; 
-      console.log('Form Data: ', formData);
-      console.log('Attempting to register with API');
-  
-      // Attempting to post to the server
-      const response = await api.post('/register', { username, email, password });
-      
-      if (!response.ok) {
-        // If the response is not ok, log the entire response
-        console.error('API Response not OK', response);
-      }
-  
-      const data = await response.data; // This assumes response is from Fetch API
-      console.log('API Response Data: ', data);
-  
-      if (data.msg) {
-        Alert.alert('Success', 'Registered successfully!');
-        // Navigate to login after successful registration
-        navigation.navigate('Login');
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+          console.log('Push Token:', pushToken);
+          // Proceed to send the token to the server
       } else {
-        // Handle any messages from the server (e.g., user already exists)
-        Alert.alert('Registration Issue', data.message || 'Failed to register.');
+          console.log('Push token registration failed.');
+          // Handle the case where no token is retrieved
       }
+
+      navigation.navigate("EmailVerification",{
+        username : formData.username,
+        email : formData.email,
+        password : formData.password
+      })
+  
+     
+      console.log('Form Data: ', formData);
+  
+    
     } catch (error) {
       console.error('Registration Error: ', error);
       Alert.alert('Registration failed!', error.message);
     }
   };
+
+  const handlePress = () => {
+    handleRegister();
+    handleSendCode();
+  };
   
 
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+  contentContainerStyle={styles.scrollViewContentContainer}
+  scrollEnabled={true} // Ensures that scrolling is enabled
+  keyboardShouldPersistTaps='handled' // Useful if you have TextInputs inside the ScrollView
+>
+<View style={styles.mainContent}>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
       <ImageBackground source={require('../Images/arrow-left.png')} style={styles.leftarrowStyle} resizeMode="contain"></ImageBackground>
     </TouchableOpacity>
       <Text style={styles.title}>Sign up</Text>
       
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Username"
-          placeholderTextColor="#aaa"
-          value={formData.username}
-          onChangeText={(text) => handleInputChange("username", text)}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Email"
-          placeholderTextColor="#aaa"
-          value={formData.email}
-          onChangeText={(text) => handleInputChange("email", text)}
-        />
+      <View style={styles.inputWithValidation}>
+    <TextInput
+      style={styles.input}
+      placeholder="Enter Username"
+      placeholderTextColor="#aaa"
+      value={formData.username}
+      onChangeText={(text) => handleInputChange("username", text)}
+    />
+    {isUsernameValid !== null && (
+      <Text style={styles.validationText}>
+        {isUsernameValid ? '✅ Unique' : '❌ Taken'}
+      </Text>
+    )}
+  </View>
+
+  <View style={styles.inputWithValidation}>
+    <TextInput
+      style={styles.input}
+      placeholder="Enter Email"
+      placeholderTextColor="#aaa"
+      value={formData.email}
+      onChangeText={(text) => handleInputChange("email", text)}
+    />
+    {isEmailValid !== null && (
+      <Text style={styles.validationText}>
+        {isEmailValid ? '✅ Unique' : '❌ Taken'}
+      </Text>
+    )}
+  </View>
+
         <TextInput
           style={styles.input}
           placeholder="Enter Password"
@@ -162,15 +337,26 @@ const postTokenToServer = async (token, username) => {
       
       <TouchableOpacity
         style={styles.registerButton}
-        onPress={handleRegister}
+        onPress={handlePress}
       >
+        <LinearGradient
+    // Button Linear Gradient
+    colors={['#F87575', '#E63946', '#B51700']} // A gradient of attractive reds
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 0 }}
+    locations={[0.3, 0.6, 1]} // Adjust these to shift where the color changes occur
+    style={styles.gradient}
+  >
         <Text style={styles.buttonText}>Sign up</Text>
+        </LinearGradient>
       </TouchableOpacity>
 
       <Text style={styles.footerText}>
         Already have an account? 
         <Text style={styles.linkText} onPress={() => navigation.navigate('Login')}> Login</Text>
       </Text>
+
+      </View>
       
       <Text style={styles.footerPolicyText}>
         By Continuing you agree to
@@ -178,15 +364,15 @@ const postTokenToServer = async (token, username) => {
         <Text style={styles.linkText} onPress={() => Linking.openURL('#')}> Terms & Conditions</Text>, and 
         <Text style={styles.linkText} onPress={() => Linking.openURL('#')}> Content Policy</Text>.
       </Text>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  scrollViewContentContainer: {
+    flexGrow: 1, // Use flexGrow instead of flex
+    alignItems: 'stretch', // Change to 'stretch' to allow content to fill the space
+    justifyContent: 'flex-start', // Adjusted for better content alignment
     backgroundColor: '#fff',
     padding: 20,
   },
@@ -194,24 +380,49 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 40,
-    color: '#000',
+    color: '#B51700', // Change color to red
+    alignSelf: 'center', // Center-align the title
   },
   inputContainer: {
     width: '100%',
   },
+  mainContent: {
+    flex: 1, // This will make the main content take up all available space
+  },
   input: {
+    flex:1,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 10,
     paddingLeft: 20,
-    paddingRight: 20,
+    paddingRight: 10, // Adjust as needed
     height: 50,
     fontSize: 16,
     marginBottom: 20,
     backgroundColor: '#f8f8f8',
   },
+  
+  inputWithValidation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: '#f8f8f8',
+  },
+  gradient: {
+    paddingHorizontal: 100,
+    paddingVertical: 12,
+    borderRadius: 25, // This should match the borderRadius of button to maintain the shape
+    justifyContent: 'center', // Center the text within the gradient
+    alignItems: 'center', // Center the text horizontally
+    minWidth: 350, // Ensures a minimum width for the button
+    maxWidth: 450, // You can adjust maxWidth as needed or remove it if not necessary
+  },
+  validationText: {
+    fontSize: 16,
+    marginLeft: 10,
+  },
   registerButton: {
-    backgroundColor: '#ff3b30',
+    
     paddingVertical: 15,
     borderRadius: 10,
     width: '100%',
@@ -226,18 +437,20 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 16,
     marginBottom: 10,
+    marginLeft:5
   },
   linkText: {
-    color: '#ff3b30',
+    color: '#B51700',
   },
   footerPolicyText: {
     fontSize: 14,
     textAlign: 'center',
+    marginTop: 10, // Add some top margin for spacing if needed
   },
   leftarrowStyle: {
     width: 40, // adjust this based on the size you want for the icon
     height: 40, // adjust this based on the size you want for the icon
-    marginRight: 10,
+  
   },
 });
 

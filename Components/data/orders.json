@@ -1,0 +1,77 @@
+[
+  {
+    "id": "1",
+    "vaccineID": "9b09b087-cf40-41f4-a375-8dc75843a8d1",
+    "status": "NEW",
+    "createdAt": "2022-04-16T18:56:21.890Z",
+    "updatedAt": "2022-04-16T18:56:21.890Z",
+    "orderVaccineId": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+    "Vaccine": {
+      "id": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+      "name": "Hepatitis B Vaccine",
+      "image": "https://notjustdev-dummy.s3.us-east-2.amazonaws.com/uber-eats/restaurant3.jpeg",
+      "deliveryFee": 0.039448871531492236,
+      "minDeliveryTime": 10,
+      "maxDeliveryTime": 44,
+      "rating": 4.5,
+      "price": 50.00 
+    },
+    "Clinic": {
+      "id": "1",
+      "name": "City Clinic",
+      "address": "123 Main Street",
+      "lat": 31.5434708,
+      "lng": 74.2766072
+    }
+  },
+  {
+    "id": "2",
+    "vaccineID": "9b09b087-cf40-41f4-a375-8dc75843a8d1",
+    "status": "NEW",
+    "createdAt": "2022-04-16T18:53:32.261Z",
+    "updatedAt": "2022-04-16T18:53:32.261Z",
+    "orderVaccineId": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+    "Vaccine": {
+      "id": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+      "name": "Flu Vaccine",
+      "image": "https://notjustdev-dummy.s3.us-east-2.amazonaws.com/uber-eats/restaurant1.jpeg",
+      "deliveryFee": 0.039448871531492236,
+      "minDeliveryTime": 10,
+      "maxDeliveryTime": 44,
+      "rating": 4.7,
+      "price": 30.00
+    },
+    "Clinic": {
+      "id": "2",
+      "name": "Local Health Center",
+      "address": "456 Elm Street",
+      "lat": 47.9,
+      "lng": 27.9
+    }
+  },
+  {
+    "id": "3",
+    "vaccineID": "9b09b087-cf40-41f4-a375-8dc75843a8d1",
+    "status": "NEW",
+    "createdAt": "2022-04-16T18:56:49.713Z",
+    "updatedAt": "2022-04-16T18:56:49.713Z",
+    "orderVaccineId": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+    "Vaccine": {
+      "id": "7d7965f7-1b33-4b8c-9bac-0c22bc905030",
+      "name": "Seasonal Vaccine",
+      "image": "https://notjustdev-dummy.s3.us-east-2.amazonaws.com/uber-eats/restaurant2.jpeg",
+      "deliveryFee": 0.039448871531492236,
+      "minDeliveryTime": 10,
+      "maxDeliveryTime": 44,
+      "rating": 4.6,
+      "price": 35.00
+    },
+    "Clinic": {
+      "id": "3",
+      "name": "Regional Medical Center",
+      "address": "789 Oak Avenue",
+      "lat": 46.86133499528364,
+      "lng": 28.54421769418778
+    }
+  }
+]

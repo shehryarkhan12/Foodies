@@ -1,5 +1,5 @@
 import React, { useState,createRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert,ImageBackground } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { API_IP_ADDRESS } from '../api/config';
 
@@ -82,6 +82,9 @@ const OTP = ({route}) => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.leftArrowContainer}>
+                <ImageBackground source={require('../Images/arrow-left.png')} style={styles.leftarrowStyle} resizeMode="contain" />
+            </TouchableOpacity>
       <View style={styles.otpContainer}>
         <Text style={styles.otpText}>Enter OTP!</Text>
         <Text style={styles.subText}>Enter code shared on your email</Text>
@@ -145,6 +148,17 @@ const styles = StyleSheet.create({
       marginBottom: 30,
       color: 'black', // Adjusted for clarity
     },
+    leftarrowStyle: {
+      width: 40, // adjust this based on the size you want for the icon
+      height: 40, // adjust this based on the size you want for the icon
+    
+    },
+    leftArrowContainer: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      zIndex: 1,
+  },
     inputContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',

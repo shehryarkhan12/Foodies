@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef,useCallback } from 'react';
-import { RefreshControl,ImageBackground,Alert,Animated,View, TextInput, Button, StyleSheet, Text,Image,FlatList,TouchableOpacity,ScrollView,Modal,Linking, StatusBar} from 'react-native';
+import { RefreshControl,ImageBackground,Alert,Animated,View, TextInput,ActivityIndicator, Button, StyleSheet, Text,Image,FlatList,TouchableOpacity,ScrollView,Modal,Linking, StatusBar} from 'react-native';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
 import MapView, { Marker } from 'react-native-maps';
@@ -7,7 +7,9 @@ import api from '../api/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios'; 
 import { useFavourites } from './favouritesContext';
-import { AntDesign } from '@expo/vector-icons';
+import {
+  Ionicons, FontAwesome5, MaterialIcons, MaterialCommunityIcons
+} from "@expo/vector-icons";
 import * as Font from 'expo-font';
 import Checkbox from 'expo-checkbox';
 import Zoom from './Zoom';
@@ -17,10 +19,18 @@ import { useRoute } from "@react-navigation/native";
 import { API_IP_ADDRESS } from '../api/config';
 import StarRating from './StarRating'; 
 import backgroundImg from '../Images/burger.jpg'; // Make sure this path is correct
-
-
+import CardLoader from './CardLoader';
+import { useNotification } from './NotificationContext';
+import { useHeartAnimation } from './HeartAnimationContext';
+import { FlashList } from '@shopify/flash-list';
+import { useRestaurants } from './RestaurantsContext';
+import ButtonWithLoader from './ButtonWithLoader';
 
 const RestaurantSearch = (props,item) => {
+const {route} = props;
+const { heartAnimationValues, updateHeartAnimation } = useHeartAnimation();
+// Or directly use props.userId
+//console.log("RestaurantSearch UserId:", props.userId);
   const filledHeart = require('../Images/filledheart.png');  // replace with your actual path
 const unfilledHeart = require('../Images/unfillledheart.png');  // replace with your actual path
   const navigation = useNavigation();
@@ -28,17 +38,17 @@ const unfilledHeart = require('../Images/unfillledheart.png');  // replace with 
   //   latitude: null,
   //   longitude: null,
   // });
+  const [isOrdering, setIsOrdering] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data,setData]=useState(null);
+  const [userId, setUserId] = useState(null);
+  const [userEmail,setUserEmail] = useState('');
 
-  const [restaurantLocation, setRestaurantLocation] = useState({
-    latitude: null,
-    longitude: null,
-  });
   const [mapCenter, setMapCenter] = useState(null);
 
-  const [restaurantName, setRestaurantName] = useState("");
-  
+  //const [restaurantName, setRestaurantName] = useState("");
+  const{restaurantName,setRestaurantName} = useRestaurants();
   const [results, setResults] = useState([]);
 
  // const [mapKey, setMapKey] = useState(1);
@@ -51,7 +61,6 @@ const unfilledHeart = require('../Images/unfillledheart.png');  // replace with 
   //console.log("Searched restaurant= ",searchedRestaurants);;
   const [top10RatedRestaurants, setTop10RatedRestaurants] = useState([]);
   //console.log("top10= ",top10RatedRestaurants);
-  const [likedRestaurants, setLikedRestaurants] = useState({});
   const [isVisible, setIsVisible] = useState(false);
   const [selectedPrice, setSelectedPrice] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
@@ -59,6 +68,9 @@ const unfilledHeart = require('../Images/unfillledheart.png');  // replace with 
   const [liked, setLiked] = React.useState(false);
   const [myData,SetMyData] = useState([]);
   //console.log("myData =",myData);
+
+  const [loadingRestaurantId, setLoadingRestaurantId] = useState(null);
+
   
   const [places, setPlaces] = useState([]);
 
@@ -69,16 +81,57 @@ const [filters, setFilters] = useState({
   priceLevel: null,
   // Add more filters here...
 });
-const { deviceLocation,setDeviceLocation,mapKey,setMapKey,token,setToken } = useItems(); 
 
 
+const { deviceLocation,setDeviceLocation,mapKey,setMapKey,token,setToken,restaurantLocation,setRestaurantLocation } = useItems(); 
+
+
+//console.log("Device Location=",deviceLocation.latitude);
+const [notificationCount, setNotificationCount, incrementNotificationCount] = useNotification();
+useEffect(() => {
+  console.log("Notification Count on Home Screen:", notificationCount);
+}, [notificationCount]);
+ 
+useEffect(() => {
+  // Fetch userId from AsyncStorage
+  const fetchUserId = async () => {
+      try {
+          const storedUserId = await AsyncStorage.getItem('userId');
+          if (storedUserId) {
+              setUserId(storedUserId);
+              //console.log("UserId in RestaurantSearch:",userId);
+          }
+      } catch (error) {
+          console.error("Failed to fetch userId from storage:", error);
+      }
+  };
+  
+  fetchUserId();
+}, []);
+
+// useEffect(() => {
+//   // Fetch userEmail from AsyncStorage
+//   const fetchUserEmail = async () => {
+//       try {
+//           const storedUserEmail = await AsyncStorage.getItem('userEmail');
+//           if (storedUserEmail) {
+//               setUserEmail(storedUserEmail);
+//               console.log("UserEmail in RestaurantSearch:",userEmail);
+//           }
+//       } catch (error) {
+//           console.error("Failed to fetch userEmail from storage:", error);
+//       }
+//   };
+  
+//   fetchUserEmail();
+// }, []);
 
 //console.log("Device Location=",deviceLocation.latitude);
   const prevRestaurantLocationRef = useRef();
 
   const animatedValue = useRef(new Animated.Value(0)).current;
 
-  const { favourites, setFavourites,saveFavouritesToStorage,removeFavourite,lastRemovedFavouriteId } = useFavourites();
+  const { favourites, setFavourites,saveFavouritesToStorage,removeFavourite,lastRemovedFavouriteId,likedRestaurants, setLikedRestaurants } = useFavourites();
 
   
 
@@ -232,6 +285,8 @@ const getMatchingMenuUrl = (searchTerm) => {
 
 
 const handleMenuButtonClick = async (item,lati,longi) => {
+  setLoadingRestaurantId(item.id); // Assuming each `item` has a unique `id`
+  
   let menuCategory = '';
   
   if (item.name.includes('pizza')||item.name.includes('Pizza')) {
@@ -253,20 +308,23 @@ const handleMenuButtonClick = async (item,lati,longi) => {
   }
 
   try {
-    console.log(`Fetching menu for category: ${menuCategory}`); // Debugging statement
+    //console.log(`Fetching menu for category: ${menuCategory}`); // Debugging statement
     const menuData = await fetchMenuFromServer(menuCategory);
     //console.log("Menu Data:", JSON.stringify(menuData, null, 2));
-    NavigateToMenuScreen(menuData,lati,longi);
-    //console.log(menuData);
+    NavigateToMenuScreen(menuData,lati,longi,userId);
+    setLoadingRestaurantId(null); // Reset the loading state once operation is done
+    //console.log("Token..=",userId);
   } catch (error) {
     console.error("Failed to fetch menu data:", error);
+    setLoadingRestaurantId(null); // Ensure to clear loading state even on error
   }
+  
 }
 
 
-const NavigateToMenuScreen = (menuData,lati,longi)=>{
-  console.log("Navigating to MenuScreen with data:", menuData); // Debugging statement
-  navigation.navigate('MenuScreen', { menuData: menuData,lati:lati,longi:longi });
+const NavigateToMenuScreen = (menuData,lati,longi,userId)=>{
+  //console.log("Navigating to MenuScreen with data:", menuData); // Debugging statement
+  navigation.navigate('MenuScreen', { menuData: menuData,lati:lati,longi:longi,token:userId });
 }
 
 
@@ -304,7 +362,7 @@ const handleApplyFilters = async () => {
   }
 }
 const BASE_URL = "https://maps.googleapis.com/maps/api/place";
-const API_KEY = "AIzaSyCYpQVzzCbBwlvAht3Mh6UlIrD_lwGsu5U"; // Replace with your actual API key
+const API_KEY = "AIzaSyDu_ikrzuCSjDJh3h0LDoz79ooMNzbKxwc"; // Replace with your actual API key
 
 const fetchDetailedInfo = async (place_id) => {
   const detailsEndpoint = `${BASE_URL}/details/json?place_id=${place_id}&key=${API_KEY}`;
@@ -364,7 +422,7 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
             ]
           },
           price_level: place.price_level || 0,
-          rating: place.rating || getRandomRating(1, 4),
+          rating: place.rating 
           
         }))
         .filter(restaurant => restaurant.contactDetails && restaurant.contactDetails.phone);  // Filtering step added here
@@ -429,7 +487,7 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
       fetchRestaurants(restaurantLocation.latitude, restaurantLocation.longitude);
     }
 
-    console.log("mapCenter changed:", mapCenter);
+   // console.log("mapCenter changed:", mapCenter);
   }, [restaurantLocation, mapCenter]);
 
 
@@ -457,19 +515,19 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
   }, [restaurantLocation]);
 
   useEffect(() => {
-    console.log("mapCenter changed:", mapCenter);  // Debugging line
+    //console.log("mapCenter changed:", mapCenter);  // Debugging line
   }, [mapCenter]);
 
   useEffect(() => {
     const latitude = restaurantLocation.latitude || deviceLocation.latitude;
     const longitude = restaurantLocation.longitude || deviceLocation.longitude;
-    console.log("Latitude:", latitude, "Longitude:", longitude);
+    //console.log("Latitude:", latitude, "Longitude:", longitude);
     if (latitude && longitude) {
       fetchRestaurants(latitude, longitude)
         .then(newResults => {
           setResults(newResults);
           const topRated = newResults
-            .filter(restaurant => restaurant.rating >= 4.3)
+            .filter(restaurant => restaurant.rating >= 4)
             .sort((a, b) => b.rating - a.rating)
             .slice(0, 10);
           setTop10RatedRestaurants(topRated);
@@ -498,7 +556,7 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
   
   const handleSearch = async (searchTerm) => {
     return new Promise(async (resolve, reject) => {
-      console.log('handleSearch called'); 
+      //console.log('handleSearch called'); 
   
       if (!searchTerm) {
         console.warn("Search term parameter is missing");
@@ -526,7 +584,7 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
       try {
         const response = await fetchNearbyPlaces(latitude, longitude, searchTerm);
         const data = response.data;
-        console.log("data:",data);
+        //console.log("data:",data);
         //setMyData(response.data);
         const detailedPromises = data.results.map(place => fetchDetailedInfo(place.place_id));
         const detailedResults = await Promise.all(detailedPromises);
@@ -585,12 +643,29 @@ const fetchNearbyPlaces = (latitude, longitude, searchTerm) => {
     });
   }
 
-const onRestaurantCardClick = (restaurantLatitude, restaurantLongitude) => {
-  setRestaurantLocation({
-    latitude: restaurantLatitude,
-    longitude: restaurantLongitude
-  });
-};
+  const onRestaurantCardClick = (item) => {
+    if (item.location && item.location.coordinates) {
+      const [latitude, longitude] = item.location.coordinates;
+      //console.log(`Selected Restaurant: ${item.name}`, latitude, longitude);
+      // Prepare location object if needed
+    const location = { latitude, longitude };
+      // Update restaurant location and map center together
+      setRestaurantLocation({ latitude, longitude });
+      setMapCenter({ latitude, longitude });
+      // Directly navigate and pass parameters without waiting for state update
+    // Navigate and pass all necessary data
+    navigation.navigate('RestaurantDetails', { 
+      restaurant: item,
+      latitude, // Pass latitude if needed
+      longitude, // Pass longitude if needed
+      location, // Pass location object if this format is preferred
+      deviceLocation, // Pass the entire deviceLocation object
+    });
+    } else {
+      console.warn(`Location data missing for: ${item.name}`);
+    }
+  };
+  
 
 const clearFilters = () => {
   setSelectedPrice('Any');
@@ -626,12 +701,23 @@ const topRatedRestaurants = [...results]
       return null;
     }
 };
+
+const handleRestaurantSelect = (item) => {
+  if (item.location && item.location.coordinates) {
+      const [latitude, longitude] = item.location.coordinates;
+     // console.log('Selected Restaurant:', item); // Debugging: Check if item has the correct data
+      setRestaurantLocation({ latitude, longitude });
+      navigation.navigate('RestaurantDetails', { restaurant: item });
+  } else {
+      console.warn(`Location data missing for: ${item.name}`);
+  }
+};
   
 
 
 
 const renderRestaurant = ({ item }) => {
-  
+ 
   const isLiked = !!likedRestaurants[item.id];
   //console.log("Menu URL:", menuUrl);
   //console.log("Results:", results);
@@ -644,8 +730,8 @@ const renderRestaurant = ({ item }) => {
             onPress={() => {
               if (item.location && item.location.coordinates) {
                 const [latitude, longitude] = item.location.coordinates;
-                console.log(`Updating map center for: ${item.name}`, latitude, longitude);
-                onRestaurantCardClick(latitude, longitude);
+                //console.log(`Updating map center for: ${item.name}`, latitude, longitude);
+                onRestaurantCardClick(item);
                 setMapCenter({
                   latitude,
                   longitude,
@@ -665,38 +751,46 @@ const renderRestaurant = ({ item }) => {
             <View style={styles.restaurantDetails}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={styles.restaurantName}>{item.name}</Text>
- {/* Add Animated Heart Icon here */}
- <Animated.View
-  style={{
-    marginTop: 10, // Adding a top margin to move the heart image down
-    transform: [
-      {
-        scale: animatedValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 1.5], // scale from 1 to 1.5 when liked
-        }),
-      },
-    ],
-  }}
->
-<TouchableOpacity onPress={() => {
-    const wasLikedBefore = likedRestaurants[item.id];
-    toggleLike(item.id);  // This will toggle the like state for the restaurant.
-    toggleFavourite(item);  // This will add or remove the restaurant from favourites.
-    
-    // Display alert based on whether the restaurant was added or removed.
+              <TouchableOpacity onPress={() => {
+    const restaurantId = item.id;
+    const wasLikedBefore = likedRestaurants[restaurantId];
+    toggleLike(restaurantId);
+    toggleFavourite(item);
+
+    if (!heartAnimationValues[restaurantId]) {
+        heartAnimationValues[restaurantId] = new Animated.Value(1);
+    }
+
+    Animated.spring(heartAnimationValues[restaurantId], {
+        toValue: wasLikedBefore ? 1 : 1.2,
+        friction: 3,
+        useNativeDriver: true,
+    }).start();
+
     if (wasLikedBefore) {
         Alert.alert('Notification', `${item.name} removed from favourites!`);
     } else {
         Alert.alert('Favourite', `${item.name} saved as favourite!`);
     }
 }}>
-<Image
-            source={isLiked ? filledHeart : unfilledHeart}
-            style={{ width: 24, height: 24 }}
-          />
-</TouchableOpacity>
+
+<Animated.View
+  style={{
+    marginTop: 10,
+    transform: [
+      {
+        scale: heartAnimationValues[item.id] || 1,
+      },
+    ],
+  }}
+>
+  <MaterialIcons 
+    name={isLiked ? 'favorite' : 'favorite-border'}
+    size={24} 
+    color={isLiked ? 'red' : 'black'} 
+  />
 </Animated.View>
+</TouchableOpacity>
 </View>
 
               <Text style={styles.restaurantInfo}>Price: {mapPriceLevelToText(item.price_level || 'default')}</Text>
@@ -709,25 +803,26 @@ const renderRestaurant = ({ item }) => {
       source={require('../Images/call.png')} 
       style={{ width: 50, height: 50 }}
     />
-    <Text style={{ marginTop: 5,marginLeft:10 }}>Call</Text>
+    <Text style={{ marginTop: 5,marginLeft:10,color:'white' }}>Call</Text>
   </TouchableOpacity>
 ) : null}
-               
-               <TouchableOpacity
-  onPress={() => handleMenuButtonClick(item, deviceLocation.latitude, deviceLocation.longitude)}
-  style={styles.orderButton}
-  activeOpacity={0.7} // Optional: Adjusts the opacity touch feedback
->
-  <Text style={styles.orderButtonText}>Order</Text>
-</TouchableOpacity>
-
-
-              
+            
+            
+      <ButtonWithLoader
+        onPress={() => handleMenuButtonClick(item, deviceLocation.latitude, deviceLocation.longitude)}
+        buttonText={loadingRestaurantId === item.id ? '' : 'Order'} // Conditionally display button text
+        isLoading={loadingRestaurantId === item.id} // Show loader for the specific restaurant
+        style={styles.orderButton}
+        textStyle={styles.orderButtonText}
+        
+      />
+      
             </View>
           </TouchableOpacity>
+         
 
           {/* Modal to show the menu card */}
-          <Modal
+          {/* <Modal
     animationType="slide"
     transparent={true}
     visible={isMenuModalVisible}
@@ -737,7 +832,7 @@ const renderRestaurant = ({ item }) => {
 >
     <View style={{flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center'}}>
         
-        {/* Adding the clickable cross image on the top right corner */}
+       
         <View style={{ position: 'absolute', top: 10, right: 10, zIndex: 1 }}>
             <TouchableOpacity onPress={() => setMenuModalVisible(false)}>
                 <Image 
@@ -750,13 +845,23 @@ const renderRestaurant = ({ item }) => {
         { menuUrl ? <Zoom source={{ uri: menuUrl }}/> : <Text>No menu available</Text> }
 
     </View>
-</Modal>
+</Modal> */}
         </View>
       );
     }
   }
   return null;
 };
+
+useEffect(() => {
+  // Fetch your data here and set isLoading to false when done
+  const timeout = setTimeout(() => {
+    setIsLoading(false); // Simulate a network request
+  }, 10000); // Simulate a delay
+
+  return () => clearTimeout(timeout); // Clean up the timeout
+}, []);
+
 
 
 const fetchData = async () => {
@@ -793,109 +898,72 @@ return (
   <FavouritesProvider>  
     
     
-  <ScrollView style={styles.container}
+  <ScrollView style={styles.scrollViewContainer}
+
   refreshControl={
     <RefreshControl
       refreshing={refreshing}
       onRefresh={onRefresh}
     />
   }>
-  <ImageBackground 
+   
+        
+
+  {/* <ImageBackground 
             source={backgroundImg}
-            style={styles.container}
+            style={styles.backgroundImage}
             resizeMode="cover"
-        >
+        > */}
+        
+      <View style={styles.topContainer}>
     <View style={styles.searchForm}>
       <View style={styles.topBar}>
       <TouchableOpacity onPress={() => props.navigation.openDrawer()}>
-    <Image source={require('../Images/menuIcon.png')} style={styles.icon} />
+      <Ionicons name="menu" size={24} color="#333333" style={styles.icon} />
   </TouchableOpacity>
+   {/* Notification Icon */}
+   <TouchableOpacity onPress={() => navigation.navigate('NotificationScreenFU', { userId:userId })} style={styles.notificationIconContainer}>
+              <Ionicons name="notifications" size={24} color="#333333" />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationCount}>{notificationCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
   <View style={{ flexDirection: 'column', alignItems: 'center', marginLeft: 80  }}>
-  <Text style={styles.universityName}>          Comsats University</Text>
-  <Text style={styles.universityName}>      Lahore</Text>
+ 
 </View>
       </View>
-      
+      </View>
+    
+     
       <View style={styles.searchContainer}>
-        <View style={styles.inputContainer}>
-        <TouchableOpacity onPress={() => {
-            handleSearch(restaurantName);
-            setRestaurantName('');} }>
-            <Image source={require('../Images/whiteSearch.png')} style={styles.icon} />
-          </TouchableOpacity>
-          <TextInput
-            placeholder="Search for restaurants, cuisines and cafes"
-            placeholderTextColor="lightgray" // This sets the placeholder text to a gray color
-            style={styles.searchInput}
-            onChangeText={text => setRestaurantName(text)}
-            value={restaurantName}
-          />
-          <Text style={styles.divider}>|</Text>
-          <TouchableOpacity onPress={() => setIsVisible(true)}>
-         <Image source={require('../Images/whiteFilter.png')} style={styles.icon} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      
-
-      <Modal
-      animationType="slide"
-      transparent={true}
-      visible={isVisible}
-    >
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <View style={{ width: '80%', backgroundColor: 'white', padding: 20, borderRadius: 10 }}>
-          <Text style={{ fontWeight: 'bold', marginBottom: 20 }}>Filter</Text>
-
-          {/* Price Filter */}
-          <Text>Price</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            {['Any', '$', '$$', '$$$', '$$$$'].map((price) => (
-              <TouchableOpacity key={price} onPress={() => setSelectedPrice(price)}>
-                <Text style={{ fontWeight: selectedPrice === price ? 'bold' : 'normal' }}>{price}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Rating Filter */}
-          <Text>Rating at least</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <StarRating
-    disabled={false}
-    maxStars={5}
-    rating={selectedRating}
-    selectedStar={(rating) => setSelectedRating(rating)}
-    fullStarColor={'gold'}
-        />
-          </View>
-
-          {/* Hours Filter */}
-          <Text>Hours</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text>Any</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Checkbox
-                value={isOpenNow}
-                onValueChange={setIsOpenNow}
-              />
-              <Text>Open now</Text>
-            </View>
-          </View>
-
-          {/* Apply and Clear Buttons */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
-            <TouchableOpacity onPress={() => { clearFilters}}>
-              <Text>Clear</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => {handleApplyFilters}}>
-              <Text>Apply</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-
+  <View style={styles.inputContainer}>
+    <TouchableOpacity onPress={() => {
+        // Navigate to SearchResultsScreen with the current search term
+        props.navigation.navigate('SearchResultsScreen', { searchTerm: restaurantName });
+        handleSearch(restaurantName);
+        setRestaurantName('');
+      }}>
+       <FontAwesome5 name="search" size={20} color="#333333" style={styles.icon} />
+    </TouchableOpacity>
+    <TextInput
+      placeholder="Search for restaurants, cuisines and cafes"
+      placeholderTextColor="gray"
+      style={styles.searchInput}
+      onChangeText={text => setRestaurantName(text)}
+      value={restaurantName}
+      onFocus={() => {
+        // Navigate to SearchResultsScreen when the TextInput is focused
+        props.navigation.navigate('SearchResultsScreen', { searchTerm: restaurantName });
+      }}
+    />
+    <Text style={styles.divider}>|</Text>
+    <TouchableOpacity>
+    <MaterialIcons name="tune" size={20} color="#333333" style={styles.icon} />
+    </TouchableOpacity>
+  </View>
+</View>
 
       {/* Render MapView after the search field */}
       <MapView
@@ -925,7 +993,22 @@ return (
 
       </MapView>
 
-      <Text style={styles.sectionTitle}>Top rated restaurants</Text>
+      </View>
+ 
+    <>
+      {isLoading ? (
+            Array.from({ length: 5 }, (_, index) => (
+              <CardLoader key={index}
+              backgroundColor="#F5F5DC" // Beige background color
+              baseColor="#6E4B34" // Dark bronze
+              highlightColor="#946F51"  // Slightly lighter dark bronze // Highlight color for animation
+              />
+            ))
+          ) : (
+       <>
+        {/* Bottom Container */}
+        <View style={styles.bottomContainer}>
+      <Text style={styles.sectionTitle}>Top Rated Restaurants</Text>
 <FlatList
   horizontal
   data={top10RatedRestaurants}
@@ -936,7 +1019,7 @@ return (
   maxToRenderPerBatch={10}  // Number of items to render per batch
 />
 
-<Text style={styles.sectionTitle}>Previously searched restaurants</Text>
+<Text style={styles.sectionTitle1}>Recommended For You</Text>
 <FlatList
   horizontal
   data={results} // use searchedRestaurants here
@@ -946,13 +1029,17 @@ return (
   initialNumToRender={5} // Number of items to render in the initial batch
   maxToRenderPerBatch={3}  // Number of items to render per batch
 />
+</View>
+</>
 
 
-      
+)} 
+
+</>
+
+    {/* </ImageBackground> */}
     
-
-    </View>
-    </ImageBackground>
+    
   </ScrollView>
   
   </FavouritesProvider>  
@@ -969,6 +1056,26 @@ return (
               
               backgroundColor: 'white', // Pastel Red
           },
+          scrollViewContainer: {
+            flex: 1,
+            paddingBottom: 180, // Adjust this value as needed
+          },
+          topContainer: {
+            padding: 10,
+            backgroundColor: '#FFFF', // A light, warm red that's easy on the eyes
+            borderBottomWidth: 1, // Adding a subtle border can improve the visual separation
+            borderBottomColor: '#DDDDDD', // A soft color for the border that's not too stark
+            shadowColor: '#000', // Optional: adds a subtle shadow for depth
+            shadowOffset: {
+              width: 0,
+              height: 1,
+            },
+            shadowOpacity: 0.2,
+            shadowRadius: 1.41,
+            elevation: 2, // For Android: adds elevation shadow
+          },
+          
+          
           topBar: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -995,13 +1102,46 @@ return (
           marginVertical: 10,
           overflow: 'hidden',
         },
-      
+        notificationIconContainer: {
+          position: 'absolute',
+          right: 10,
+          top: 10,
+        },
+        bottomContainer: {
+          // Styles for the bottom container
+          padding: 10,
+          backgroundColor: '#FFFF', // A light, warm red that's easy on the eyes
+            borderBottomWidth: 1, // Adding a subtle border can improve the visual separation
+            borderBottomColor: '#DDDDDD', // A soft color for the border that's not too stark
+        },
+        notificationBadge: {
+          position: 'absolute',
+          right: -6,
+          top: -3,
+          backgroundColor: 'red',
+          borderRadius: 6,
+          width: 12,
+          height: 12,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        notificationCount: {
+          color: 'white',
+          fontSize: 10,
+          fontWeight: 'bold',
+        },
         searchIcon: {
           position: 'relative',
           left: 10,
           zIndex: 1,
           width: 20,
           height: 20,
+        },
+        backgroundImage: {
+          flex: 1,
+          width: '100%',
+          height: '100%',
+          justifyContent: 'center', // Adjust this to position your content
         },
         universityName: {
           textAlign: 'center',
@@ -1039,11 +1179,26 @@ return (
             paddingHorizontal: 0, // Remove horizontal padding if any
           },
           sectionTitle: {
-              fontSize: 18,
-              fontWeight: 'bold',
-              marginVertical: 10,
-              color:'white',
-              paddingHorizontal: 0,
+            fontSize: 26, // larger font size
+            fontWeight: 'bold',
+            color: '#D35400', // vibrant color
+            marginTop: 20,
+            marginBottom: 10,
+            marginLeft: 3,
+            textShadowColor: 'rgba(0, 0, 0, 0.25)', // subtle text shadow for depth
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 2,
+          },
+          sectionTitle1: {
+            fontSize: 26,
+            fontWeight: 'bold',
+            color: '#27AE60', // another vibrant color
+            marginTop: 20,
+            marginBottom: 10,
+            marginLeft: 5,
+            textShadowColor: 'rgba(0, 0, 0, 0.25)',
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 2,
           },
           resultsList: {
               flex: 1,
@@ -1057,18 +1212,19 @@ return (
               borderColor: 'lightgray',
           },
           restaurantImage: {
-           
             width: '100%',
             height: 200,
             borderRadius: 8,
-            
+            borderWidth: 1,
+            borderColor: '#ddd',
+            overflow: 'hidden', // Ensures the borderRadius is applied
           },
           restaurantDetails: {
               flex: 1,
           },
           restaurantName: {
-            fontSize: 18,
-            fontWeight: 'bold',
+            fontSize: 20,
+            fontWeight: '600',
             marginTop: 10,
           },
           restaurantInfo: {
@@ -1109,6 +1265,7 @@ return (
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 10, // Apply right margin between cards
+          padding: 15, // Increase padding for a better layout
         },
         restaurantRating: {
           fontSize: 20,  // You can adjust this as needed
@@ -1143,7 +1300,7 @@ return (
       },
       orderButton: {
         backgroundColor: '#004D40', // A professional dark teal color
-        paddingVertical: 10,
+        paddingVertical: 4,
         paddingHorizontal: 20,
         borderRadius: 5,
         alignItems: 'center', // Center the text inside the button
@@ -1155,11 +1312,31 @@ return (
         shadowRadius: 1.5,
         marginTop: 10, // Give some space from other elements
       },
-    
+      loaderContainer: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -50 }, { translateY: -50 }], // Center the loader
+        alignItems: 'center',
+        color:'white'
+      },
       orderButtonText: {
-        color: 'white', // White color for the text
-        fontSize: 16,
-        fontWeight: '600', // Semi-bold
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom:5,
+      },
+      callButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        backgroundColor: '#4CAF50', // Green color for call action
+        borderRadius: 5,
+        marginTop: 10,
+      },
+      callButtonText: {
+        color: 'white',
+        marginLeft: 5,
       },
         menuImage: {
           width: 300,
@@ -1170,4 +1347,6 @@ return (
          
 
 export default RestaurantSearch;
+
+
 

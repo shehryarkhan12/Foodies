@@ -7,13 +7,25 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
   const [isDarkMode, setDarkMode] = useState(false);
+  const [isNotificationsMuted, setNotificationsMuted] = useState(false);
 
   const toggleTheme = () => {
     setDarkMode(!isDarkMode);
   };
+  const toggleNotifications = () => {
+    setNotificationsMuted(!isNotificationsMuted);
+    console.log("Notifications Muted Toggled: ", !isNotificationsMuted); // Log notifications muted state change
+  };
+
+
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
+    <ThemeContext.Provider value={{ 
+      isDarkMode, 
+      toggleTheme, 
+      isNotificationsMuted, 
+      toggleNotifications 
+    }}>
       {children}
     </ThemeContext.Provider>
   );

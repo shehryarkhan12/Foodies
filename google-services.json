@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "464353221720",
+    "project_id": "analog-patrol-402721",
+    "storage_bucket": "analog-patrol-402721.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:464353221720:android:95205273447e1737f0fe2d",
+        "android_client_info": {
+          "package_name": "com.mycompany.foodies_hub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWAc_ERFMBdWUuVCz7RcCqqEmqyc5RCTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

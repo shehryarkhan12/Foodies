@@ -4,7 +4,7 @@ import { useFavourites } from './favouritesContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MyFavourites = () => {
-    const { favourites, removeFavourite } = useFavourites();
+    const { favourites, removeFavourite, likedRestaurants } = useFavourites();
     console.log(favourites);
     const saveFavouritesToStorage = async (favourites) => {
         try {

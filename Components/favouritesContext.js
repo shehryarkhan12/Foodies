@@ -1,6 +1,6 @@
 import React from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { useHeartAnimation } from './HeartAnimationContext';
 const FavouritesContext = React.createContext();
 
 export const useFavourites = () => React.useContext(FavouritesContext);
@@ -8,7 +8,8 @@ export const useFavourites = () => React.useContext(FavouritesContext);
 export const FavouritesProvider = ({ children }) => {
     const [favourites, setFavourites] = React.useState([]);
     const [lastRemovedFavouriteId, setLastRemovedFavouriteId] = React.useState(null);
-
+    const [likedRestaurants, setLikedRestaurants] = React.useState({});
+    const { updateHeartAnimation } = useHeartAnimation(); // Access the update function
     // Load favourites when the component mounts
     React.useEffect(() => {
         (async () => {
@@ -54,10 +55,16 @@ export const FavouritesProvider = ({ children }) => {
           } catch (error) {
             console.error("Error removing favourite: ", error);
           }
+          setLikedRestaurants(prevLikedRestaurants => {
+            const updatedLikedRestaurants = { ...prevLikedRestaurants };
+            delete updatedLikedRestaurants[itemId];
+            updateHeartAnimation(itemId, 1);
+            return updatedLikedRestaurants;
+        });
     };
 
     return (
-        <FavouritesContext.Provider value={{ favourites, setFavourites, addFavourite, removeFavourite,saveFavouritesToStorage,loadFavouritesFromStorage,lastRemovedFavouriteId }}>
+        <FavouritesContext.Provider value={{ favourites, setFavourites, addFavourite, removeFavourite,saveFavouritesToStorage,loadFavouritesFromStorage,lastRemovedFavouriteId, likedRestaurants, setLikedRestaurants }}>
             {children}
         </FavouritesContext.Provider>
     );

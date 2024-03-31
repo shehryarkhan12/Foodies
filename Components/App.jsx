@@ -4,20 +4,19 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import CustomDrawer from './CustomDrawer'; // Adjust the path accordingly
+import CustomDrawer from './CustomDrawer'; 
 import { FavouritesProvider } from './favouritesContext';
 import Login from './Login';
 import Register from './Register';
 import StartScreen from './StartScreen';
 import newLogin from './newLogin';
-import RestaurantDetails from './RestaurantDetails';
 import ForgetPassword from './ForgetPassword';
 import OTP from './OTP';
 import NewPassword from './NewPassword';
 import Profile from './Profile';
 import Zoom from './Zoom';
 import UpdatedRestaurantSearch from './UpdatedRestaurantSearch';
-import RestaurantSearch from './RestaurantSearch';  // I assume you already have this imported
+import RestaurantSearch from './RestaurantSearch';
 import MyFavourites from './MyFavourites';
 import CameraContext from './CameraContext.js';
 import AvatarContext from './AvatarContext';
@@ -40,7 +39,32 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Settings from './Settings';
 import { ThemeProvider } from './ThemeContext';
-import { useTheme } from './ThemeContext'; // Import useTheme
+import { useTheme } from './ThemeContext'; 
+import HelpCenterScreen from './HelpCenterScreen';
+import ChatScreen from './ChatScreen';
+import SearchResultsScreen from './SearchResultsScreen';
+import RestaurantDetailsScreen from './RestaurantDetails';
+import SplashScreen from './SplashScreen';
+import { RestaurantsProvider } from './RestaurantsContext';
+import EmailVerification from './EmailVerification';
+import FilterScreen from './FilterScreen';
+import OrderDelivery from './OrderDelivery';
+import OrderItem from './OrderItem';
+import OrdersScreen from './OrdersScreen';
+import NotificationScreenFU from './NotificationScreenFU';
+import CombinedOrderScreen from './CombinedOrderScreen';
+import PaymentScreen from './PaymentScreen';
+import OrderComplete from './OrderComplete';
+import CustomDrawerFR from './CustomDrawerFR';
+import Pagination from './Pagination';
+import Question from './Question';
+import EmailVerificationFR from './EmailVerificationFR';
+import { HeartAnimationProvider } from './HeartAnimationContext';
+import { UserProvider } from './UserContext';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import TabButton from './TabButton';
+import { useRestaurants } from './RestaurantsContext';
+import CartScreen from './CartScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -56,18 +80,47 @@ const RestaurantSearchWithDrawer = ({ route}) => {
     Favourites: false,
     Settings: false,
   });
+  const {restaurantName} = useRestaurants();
   const navigation = useNavigation();
   const { userEmail, userName, userId,avatarSource } = route.params;
-  console.log("avatarSource:",route.params.avatarSource);
+
+
+  // This state will track the animated value
+  const tabWidths = {
+    Home: useSharedValue(100),
+    Profile: useSharedValue(100),
+    Favourites: useSharedValue(100),
+    Settings: useSharedValue(100),
+  };
+
+
+
   const getTabBarStyle = () => {
+    const baseStyle = {
+      borderTopLeftRadius: 30, // Round the top left edge
+      borderTopRightRadius: 30, // Round the top right edge
+      position: 'absolute', // Needed to make sure the corners and shadow are visible
+      
+      elevation: 5, // Remove default shadow on Android
+      shadowColor: '#000', // Shadow color for iOS
+      shadowOffset: {
+        width: 0,
+        height: -10, // Shadow on top of the container
+      },
+      shadowOpacity: 1, // Subtle shadow opacity
+      shadowRadius: 10, // Shadow blur radius
+    };
     if (isDarkMode) {
       return {
+        ...baseStyle,
         backgroundColor: '#121212', // Dark mode background color
         borderTopColor: '#333333', // Dark mode top border color
       };
     } else {
       return {
-        backgroundColor: 'white',
+        ...baseStyle,
+        backgroundColor: '#FFF',
+        borderTopColor: '#ddd', // Light border color for top edge if needed
       };
     }
   };
@@ -100,8 +153,25 @@ const RestaurantSearchWithDrawer = ({ route}) => {
       Favourites: iconName === 'Favourites' ? !prevStates.Favourites : false,
       Settings: iconName === 'Settings' ? !prevStates.Settings : false,
     }));
+
+    
+    Object.keys(tabWidths).forEach((key) => {
+      tabWidths[key].value = withTiming(iconName === key ? 150 : 100, {
+        duration: 250,
+        easing: Easing.out(Easing.quad), // Easing function for a quicker response
+      });
+    });
   };
   
+  const animatedTabStyle = (tabName) => useAnimatedStyle(() => {
+    return {
+      width: tabWidths[tabName].value,
+      height: 50, // Fixed height for tabs
+      justifyContent: 'center',
+      alignItems: 'center',
+      // Add shadow style here if you want
+    };
+  });
  
   
   return (
@@ -113,12 +183,19 @@ const RestaurantSearchWithDrawer = ({ route}) => {
             <Tab.Navigator 
             screenOptions={{
               headerShown: false,
-              tabBarStyle: getTabBarStyle(),
+              lazy: true, // Render the tab screen only when it comes into focus
+              tabBarStyle: [getTabBarStyle(), { height: 70 }], // Adjust height as needed
             }}
           >
             <Tab.Screen 
               name="Home" 
               component={RestaurantSearch}
+              initialParams={{
+                email: route.params.email,
+                 username: route.params.username,
+                 id: route.params.id,
+                 avatarSource: avatarSource
+             }}
               listeners={{
                 tabPress: (e) => {
                   // This prevents the default action
@@ -130,18 +207,10 @@ const RestaurantSearchWithDrawer = ({ route}) => {
               }}
               options={{
                 tabBarLabel: 'Home',
-                tabBarIcon: ({ color,focused,size }) => (
-                  
-                  <TouchableOpacity onPress={() => handleIconClick('Home')}>
-      <Ionicons
-        name="home-outline"
-        color={getIconColor(focused, 'Home')}
-       
-        size={size}
-      />
-    </TouchableOpacity>
-                  
-                ),
+                unmountOnBlur: true,
+                tabBarButton: (props) => <TabButton {...props} item={{ name: 'Home', activeIconName: 'home', inactiveIconName: 'home-outline' }} />,
+      tabBarShowLabel: false,
+                
               }} 
             />
             <Tab.Screen 
@@ -164,24 +233,32 @@ const RestaurantSearchWithDrawer = ({ route}) => {
               }}
               options={{
                 tabBarLabel: 'Profile',
-                tabBarIcon: ({ color,focused,size }) => (
-                  
-                  <TouchableOpacity
-  onPress={() => handleIconClick('Profile', {
-    email: route.params.email,
-    username: route.params.username,
-    id: route.params.id,
-    avatarSource: avatarSource,
-  })}
->
-  <Ionicons
-    name="person-outline"
-    color={getIconColor(focused, 'Home')}
-    size={size}
-  />
-</TouchableOpacity>
-                  
-                ),
+                unmountOnBlur: true, // Add this option to unmount the screen when it's not focused
+                tabBarButton: (props) => <TabButton {...props} item={{ name: 'Profile', activeIconName: 'person', inactiveIconName: 'person-outline' }} />,
+                tabBarShowLabel: false,
+                
+              }} 
+            />
+            <Tab.Screen 
+              name="Search" 
+              component={SearchResultsScreen}
+              initialParams={{
+                searchTerm: restaurantName
+             }}
+              listeners={{
+                tabPress: (e) => {
+                  // This prevents the default action
+                 // e.preventDefault();
+                  setActiveTab('Search');
+                  // Add navigation to switch to the corresponding tab
+                  navigation.navigate('SearchResultsScreen');
+                }
+              }}
+              options={{
+                tabBarLabel: 'Search',
+                unmountOnBlur: true, // Add this option to unmount the screen when it's not focused
+                tabBarButton: (props) => <TabButton {...props} item={{ name: 'Search', activeIconName: 'search', inactiveIconName: 'search-outline' }} />,
+                
               }} 
             />
             <Tab.Screen 
@@ -190,7 +267,7 @@ const RestaurantSearchWithDrawer = ({ route}) => {
               listeners={{
                 tabPress: (e) => {
                   // This prevents the default action
-                 // e.preventDefault();
+                 //e.preventDefault();
                   setActiveTab('Favourites');
                   // Add navigation to switch to the corresponding tab
                   navigation.navigate('Favourites');
@@ -198,17 +275,9 @@ const RestaurantSearchWithDrawer = ({ route}) => {
               }}
               options={{
                 tabBarLabel: 'Favourites',
-                tabBarIcon: ({ color,focused,size }) => (
-                  
-                  <TouchableOpacity onPress={() => handleIconClick('Favourites')}>
-      <Ionicons
-        name="heart-outline"
-        color={getIconColor(focused, 'Home')}
-        size={size}
-      />
-    </TouchableOpacity>
-                  
-                ),
+                unmountOnBlur: true, // Add this option to unmount the screen when it's not focused
+                tabBarButton: (props) => <TabButton {...props} item={{ name: 'Favourites', activeIconName: 'heart', inactiveIconName: 'heart-outline' }} />,
+                
               }} 
             />
             <Tab.Screen 
@@ -225,17 +294,10 @@ const RestaurantSearchWithDrawer = ({ route}) => {
               }}
               options={{
                 tabBarLabel: 'Settings',
-                tabBarIcon: ({ color,focused,size }) => (
-                  
-                  <TouchableOpacity onPress={() => handleIconClick('Settings')}>
-      <Ionicons
-        name="settings-outline"
-        color={getIconColor(focused, 'Home')}
-        size={size}
-      />
-    </TouchableOpacity>
-                  
-                ),
+                unmountOnBlur: true, // Add this option to unmount the screen when it's not focused
+                tabBarButton: (props) => <TabButton {...props} item={{ name: 'Settings', activeIconName: 'settings', inactiveIconName: 'settings-outline' }} />,
+                tabBarShowLabel: false,
+                
               }} 
             />
           </Tab.Navigator>
@@ -255,7 +317,7 @@ const RestaurantDashboardWithDrawer = ({ route }) => {
     <ItemsProvider>
     <Drawer.Navigator 
       drawerContent={props => 
-        <CustomDrawer 
+        <CustomDrawerFR 
           {...props} 
           userEmail={route.params.email} 
           userName={route.params.username} 
@@ -280,9 +342,12 @@ const App = () => {
   const [orderId, setOrderId] = useState(null);
 
   return (
+    <HeartAnimationProvider>
+    <RestaurantsProvider>
     <ThemeProvider>
     <PriceProvider>
     <ItemsProvider>
+    <UserProvider>
     <NotificationProvider>
     <AvatarContext.Provider value={{ avatarSource, setAvatarSource }}>
     <CameraContext.Provider value={{
@@ -294,15 +359,15 @@ const App = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="StartScreen">
+        <Stack.Navigator initialRouteName="CartScreen">
           <Stack.Screen name="Login" options={{ headerShown: false }} >
           {props => <Login {...props} setUserEmail={setUserEmail} setUserName={setUserName} setUserId={setUserId} />}
             </Stack.Screen>
             <Stack.Screen name="Drawer" options={{ headerShown: false }}>
    {props => <RestaurantSearchWithDrawer {...props} userEmail={userEmail} userName={userName} userId={userId} />}
 </Stack.Screen>
-            
-          <Stack.Screen name="Register" component={Register} options={{ title: '' }} />
+          <Stack.Screen name="SplashScreen" component={SplashScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Register" component={Register} options={{ headerShown: false }} />
           <Stack.Screen name="CustomTabNavigator" component={CustomTabNavigator} options={{ title: '' }} />
           <Stack.Screen name="StartScreen" component={StartScreen} options={{ headerShown: false }} />
           <Stack.Screen name="RestaurantSearch" component={RestaurantSearchWithDrawer} options={{ headerShown: false }} />
@@ -316,12 +381,28 @@ const App = () => {
           <Stack.Screen name="AddressScreen" component={AddressScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
           <Stack.Screen name="RestaurantLogin" component={RestaurantLogin} options={{ headerShown: false }} />
-          
+          <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="HelpCenterScreen" component={HelpCenterScreen} options={{ headerShown: false }} />
           <Stack.Screen name="RestaurantDashboard" component={RestaurantDashboardWithDrawer} options={{ headerShown: false }} />
-          <Stack.Screen name="RestaurantRegister" component={RestaurantRegister}  />
+          <Stack.Screen name="RestaurantRegister" component={RestaurantRegister} options={{ headerShown: false }}  />
           <Stack.Screen name="NotificationScreen" component={NotificationScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="NotificationScreenFU" component={NotificationScreenFU} options={{ headerShown: false }} />
           <Stack.Screen name="ConfirmOrder" component={ConfirmOrderScreen} options={{ headerShown: false }} />
           <Stack.Screen name="OrderDetails" component={OrderScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="SearchResultsScreen" component={SearchResultsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="EmailVerification" component={EmailVerification} options={{ headerShown: false }} />
+          <Stack.Screen name="FilterScreen" component={FilterScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PaymentScreen" component={PaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="OrderDelivery" component={OrderDelivery} options={{ headerShown: false }} />
+          <Stack.Screen name="OrderItem" component={OrderItem} options={{ headerShown: false }} />
+          <Stack.Screen name="OrdersScreen" component={OrdersScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="CombinedOrderScreen" component={CombinedOrderScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="OrderComplete" component={OrderComplete} options={{ headerShown: false }} />
+          <Stack.Screen name="Pagination" component={Pagination} options={{ headerShown: false }} />
+          <Stack.Screen name="Question" component={Question} options={{ headerShown: false }} />
+          <Stack.Screen name="EmailVerificationFR" component={EmailVerificationFR} options={{ headerShown: false }} />
+          <Stack.Screen name="CartScreen" component={CartScreen} options={{ headerShown: false }} />
 
         </Stack.Navigator>
       </NavigationContainer>
@@ -330,9 +411,12 @@ const App = () => {
     </CameraContext.Provider>
     </AvatarContext.Provider>
     </NotificationProvider>
+    </UserProvider>
     </ItemsProvider>
     </PriceProvider>
     </ThemeProvider>
+    </RestaurantsProvider>
+    </HeartAnimationProvider>
   );
 };
 

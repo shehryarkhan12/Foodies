@@ -188,7 +188,7 @@ let lati = route.params?.lati;
   return (
     <ScrollView style={styles.container}>
        
-         <MapView
+         {/* <MapView
       ref={mapRef}
       style={{ height: 300 }}
       region={{
@@ -207,7 +207,7 @@ let lati = route.params?.lati;
           title="User Location"
         />
       )}
-    </MapView>
+    </MapView> */}
         {data.map((item, index) => (
             <View key={index} style={styles.itemContainer}>
                 <View style={styles.itemHeader}>

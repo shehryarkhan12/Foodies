@@ -3,11 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView,View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { API_IP_ADDRESS } from '../api/config';
 import { useTheme } from './ThemeContext'; // Import useTheme
+import { useFocusEffect } from '@react-navigation/native';
+import { useUserDetails } from './UserContext';
 
 const Profile = ({ route,navigation }) => {
-    const { username: initialUsername, email: initialEmail,avatarSource } = route.params;
+    const { username: initialUsername, email: initialEmail,avatarSource,id } = route.params;
+  
     const [userId, setUserId] = useState(null);
     const [username, setUsername] = useState(initialUsername || '');
+    const { userDetails, setUserDetails } = useUserDetails();
     const [email, setEmail] = useState(initialEmail || '');
     const [password, setPassword] = useState('************');
     const [editingField, setEditingField] = useState(null);
@@ -20,6 +24,7 @@ console.log("AvatarSource:",avatarSource);
                 const storedUserId = await AsyncStorage.getItem('userId');
                 if (storedUserId) {
                     setUserId(storedUserId);
+                    console.log("UserId in Profile:",userId);
                 }
             } catch (error) {
                 console.error("Failed to fetch userId from storage:", error);
@@ -28,6 +33,46 @@ console.log("AvatarSource:",avatarSource);
         
         fetchUserId();
     }, []);
+
+    useFocusEffect(
+      React.useCallback(() => {
+          const fetchUserDetails = async () => {
+              try {
+                  const storedUserId = await AsyncStorage.getItem('userId');
+                  if (!storedUserId) {
+                      console.error("UserId not found");
+                      return;
+                  }
+
+                  const response = await fetch(`http://${API_IP_ADDRESS}/user/${storedUserId}`, {
+                      method: 'GET',
+                      headers: {
+                          'Content-Type': 'application/json',
+                      },
+                  });
+
+                  if (!response.ok) {
+                      throw new Error('Failed to fetch user details');
+                  }
+
+                  const data = await response.json();
+                  
+                  // Update context with fetched user details
+                  setUserDetails(prev => ({
+                      ...prev,
+                      username: data.username,
+                      email: data.email,
+                      userId: storedUserId // Assuming you want to store userId in context
+                  }));
+              } catch (error) {
+                  console.error("Failed to fetch user details:", error);
+              }
+          };
+
+          fetchUserDetails();
+      }, [])
+  );
+  
 
     const handleEdit = (field) => {
         setEditingField(field);
@@ -39,41 +84,45 @@ console.log("AvatarSource:",avatarSource);
         // Otherwise, handle the back action accordingly
       };
 
-    const handleUpdate = async (field, newValue) => {
-        if (!userId) {
-            alert("User ID not found. Please log in again.");
-            return;
+   // Adjust handleUpdate to update context
+   const handleUpdate = async (field, newValue) => {
+    if (!userDetails.userId) {
+        alert("User ID not found. Please log in again.");
+        return;
+    }
+
+    // Adjust field name for the schema if necessary
+    const schemaField = field === 'Username' ? 'username' : field.toLowerCase();
+
+    try {
+      const response = await fetch(`http://${API_IP_ADDRESS}/update`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: userDetails.userId, field: schemaField, newValue }),
+    });
+        if (!response.ok) {
+            throw new Error(`Failed to update: ${response.statusText}`);
         }
 
-        try {
-            const response = await fetch(`http://${API_IP_ADDRESS}/update`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ userId, field, newValue }),
-            });
-
-            if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error('Endpoint not found. Please check the server.');
-                }
-                throw new Error(`Server responded with an error. Status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data?.error) {
-                alert("Failed to update profile: " + data.error);
-            } else {
-                setEditingField(null);
-                alert(`${field} updated successfully!`);
-            }
-        } catch (error) {
-            console.error("Update error:", error);
-            alert("Failed to update profile: " + error.message);
+        const data = await response.json();
+        if (data?.error) {
+            alert("Failed to update profile: " + data.error);
+        } else {
+            // Update user details in context
+            setUserDetails(prev => ({
+                ...prev,
+                [schemaField]: newValue
+            }));
+            setEditingField(null);
+            alert(`${field} updated successfully!`);
         }
-    };
+    } catch (error) {
+        console.error("Update error:", error);
+        alert("Failed to update profile: " + error.message);
+    }
+};
 
     return (
         <ScrollView style={[styles.container, isDarkMode ? styles.darkContainer : {}]}>

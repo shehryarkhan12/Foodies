@@ -48,6 +48,9 @@ const NewPassword = ({route}) => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.leftArrowContainer}>
+                <ImageBackground source={require('../Images/arrow-left.png')} style={styles.leftarrowStyle} resizeMode="contain" />
+            </TouchableOpacity>
     <Text style={styles.headerText}>Create New Password</Text>
     <Text style={styles.subHeaderText}>Create a new unique password</Text>
     <ImageBackground source={require('../Images/lock.png')} style={[styles.iconStyle, { top: 340 }]} resizeMode="contain" />
@@ -110,6 +113,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     
   },
+  leftarrowStyle: {
+    width: 40, // adjust this based on the size you want for the icon
+    height: 40, // adjust this based on the size you want for the icon
+  
+  },
+  leftArrowContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 1,
+},
   confirmButton: {
     width: '50%',
     height: 50,

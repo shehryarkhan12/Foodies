@@ -13,9 +13,14 @@ import AvatarContext from './AvatarContext';
 import { FavouritesProvider } from './favouritesContext';
 import * as Location from 'expo-location';
 import { useTheme } from './ThemeContext'; // Import useTheme
+import { useFocusEffect } from '@react-navigation/native';
+import { API_IP_ADDRESS } from '../api/config';
+import { useUserDetails } from './UserContext';
 
 function CustomDrawer(props) {
  
+  console.log("CustomDrawer UserId:", props.userId);
+  const { userDetails, setUserDetails } = useUserDetails(); // Use user details from context
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [isActionMenuVisible, setActionMenuVisible] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -41,6 +46,45 @@ const fetchStoredAvatar = async () => {
       setAvatarSource(JSON.parse(storedAvatar));
     }
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+        const fetchUserDetails = async () => {
+            try {
+                const storedUserId = await AsyncStorage.getItem('userId');
+                if (!storedUserId) {
+                    console.error("UserId not found");
+                    return;
+                }
+
+                const response = await fetch(`http://${API_IP_ADDRESS}/user/${storedUserId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch user details');
+                }
+
+                const data = await response.json();
+                
+                // Update context with fetched user details
+                setUserDetails(prev => ({
+                    ...prev,
+                    username: data.username,
+                    email: data.email,
+                    userId: storedUserId // Assuming you want to store userId in context
+                }));
+            } catch (error) {
+                console.error("Failed to fetch user details:", error);
+            }
+        };
+
+        fetchUserDetails();
+    }, [])
+);
 
 
   const capturePhoto = async () => {
@@ -153,8 +197,8 @@ const fetchStoredAvatar = async () => {
     style={styles.avatar}
   />
 </TouchableOpacity>
-<Text style={[styles.name, isDarkMode ? styles.darkName : {}]}>{props.userName}</Text>
-      <Text style={[styles.email, isDarkMode ? styles.darkEmail : {}]}>{props.userEmail}</Text>
+<Text style={[styles.name, isDarkMode ? styles.darkName : {}]}>{userDetails.username}</Text>
+      <Text style={[styles.email, isDarkMode ? styles.darkEmail : {}]}>{userDetails.email}</Text>
           </View>
   
           {/* Action Menu */}
@@ -183,10 +227,14 @@ const fetchStoredAvatar = async () => {
           /> 
             <DrawerItem labelStyle={styles.itemLabel}  label={() => <CustomLabel text="My Favourites" />} onPress={() => navigation.navigate('MyFavourites')} />
             <DrawerItem labelStyle={styles.itemLabel} label={() => <CustomLabel text="Previous Orders" />} onPress={() => navigation.navigate('OrderDetails')} />
-            <DrawerItem labelStyle={styles.itemLabel} label={() => <CustomLabel text="Notifications" />} onPress={() => navigation.navigate('NotificationScreen')} />
+            <DrawerItem 
+    labelStyle={styles.itemLabel} 
+    label={() => <CustomLabel text="Notifications" />}
+    onPress={() => navigation.navigate('NotificationScreenFU', { userId: props.userId })}
+/>
             <DrawerItem  label={() => <CustomLabel text="Address" />} labelStyle={styles.itemLabel} onPress={() => navigation.navigate('AddressScreen')} />
             <DrawerItem label={() => <CustomLabel text="Settings" />} labelStyle={styles.itemLabel} onPress={() => navigation.navigate('Settings')} />
-            <DrawerItem label={() => <CustomLabel text="Help Center" />} labelStyle={styles.itemLabel} onPress={() => {}} />
+            <DrawerItem label={() => <CustomLabel text="Help Center" />} labelStyle={styles.itemLabel} onPress={() => navigation.navigate('HelpCenterScreen')} />
             <DrawerItem 
   label={() => <CustomLabel text="Log Out" />}
   labelStyle={styles.itemLabel} 

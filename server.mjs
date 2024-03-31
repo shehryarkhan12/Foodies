@@ -7,18 +7,34 @@ const { compareSync } = pkg;
 import axios from 'axios';
 const { get } = axios;
 import { Expo } from 'expo-server-sdk';
+import bodyParser from 'body-parser';
+import dialogflow from '@google-cloud/dialogflow';
 
+import dotenv from 'dotenv';
+
+dotenv.config({ path: './GAC.env' });
+
+console.log(process.env.MY_VARIABLE); // should output 'value'
+console.log(process.env.GOOGLE_APPLICATION_CREDENTIALS); // should output the path to your JSON file
+import { v4 as uuidv4 } from 'uuid';
+
+const sessionId = uuidv4();  // Generates a unique session ID
+const projectId = 'analog-patrol-402721'; // Google Cloud Project ID
+
+// Create a new session
+const sessionClient = new dialogflow.SessionsClient();
+
+// Initialize the session path
+const sessionPath = sessionClient.projectAgentSessionPath(projectId, sessionId);
 let expo = new Expo();
-
 
 import cors from 'cors';
 const router = Router();
 import config from './config.json' assert { type: 'json' };
-import bodyParser from 'body-parser';
 import nodemailer from 'nodemailer';
 
 
-const GOOGLE_API_KEY = 'AIzaSyCYpQVzzCbBwlvAht3Mh6UlIrD_lwGsu5U';
+const GOOGLE_API_KEY = 'AIzaSyDu_ikrzuCSjDJh3h0LDoz79ooMNzbKxwc';
 console.log("Using Google API Key:", GOOGLE_API_KEY);
 const app = express();
 const PORT = 4000;
@@ -40,6 +56,15 @@ const userSchema = new Schema({
 });
 
 const User = model('User', userSchema);
+
+const verificationSchema = new Schema({
+    email: { type: String, required: true, unique: true },
+    verificationCode: { type: String, required: true },
+    expiresAt: { type: Date, required: true }
+});
+
+const Verification = model('Verification', verificationSchema);
+
 const restaurantSchema = new Schema({
     name: String,
     address: String,
@@ -74,7 +99,31 @@ const restaurantSchema = new Schema({
 restaurantSchema.index({ location: '2dsphere' });
 const Restaurant = model('Restaurant', restaurantSchema);
 
+const notificationSchema = new Schema({
+    userId: { 
+        type: Schema.Types.ObjectId, 
+        ref: 'User',
+        required: true 
+    },
+    title: { 
+        type: String, 
+        required: true 
+    },
+    message: { 
+        type: String, 
+        required: true 
+    },
+    read: { 
+        type: Boolean, 
+        default: false 
+    },
+    createdAt: { 
+        type: Date, 
+        default: Date.now 
+    }
+});
 
+const Notification = model('Notification', notificationSchema);
 
 const itemSchema = new Schema({
     name: {
@@ -113,6 +162,7 @@ const itemSchema = new Schema({
     lati: Number,
     longi: Number,
     token: String,
+
     
     // Add more fields as necessary
   });
@@ -1012,6 +1062,38 @@ app.use(cors());
 app.use(json());
 app.use(bodyParser.json({ limit: '50mb' }));
 
+const BASE_URL = "https://maps.googleapis.com/maps/api/place";
+const API_KEY = "AIzaSyDu_ikrzuCSjDJh3h0LDoz79ooMNzbKxwc"; // Replace with your actual API key
+
+app.get('/suggestions', async (req, res) => {
+    try {
+      const searchTerm = req.query.q;
+      const cityLatitude = req.query.lat; // Latitude of the city center
+      const cityLongitude = req.query.lon; // Longitude of the city center
+      const searchRadius = req.query.radius; // Search radius in meters
+  
+      const types = ['restaurant', 'cafe']; // Types you want to include in suggestions
+      const combinedSearchTerm = `${searchTerm} ${types.join(' OR ')}`; // Combining search term with types
+  
+      // Set up the parameters for the Google Places API request
+      const params = {
+        query: combinedSearchTerm,
+        key: API_KEY,
+        location: `${cityLatitude},${cityLongitude}`, // Location parameter
+        radius: searchRadius, // Radius parameter
+      };
+  
+      // Fetch data from Google Places API
+      const response = await axios.get(`${BASE_URL}/textsearch/json`, { params });
+      const results = response.data.results;
+  
+      res.json(results);
+    } catch (error) {
+      console.error('Error fetching data from Google Places API:', error);
+      res.status(500).send('Error fetching data');
+    }
+  });
+
 app.post('/saveExpoPushTokenFR', async (req, res) => {
     const { username, token } = req.body;
 
@@ -1040,17 +1122,24 @@ app.post('/saveExpoPushTokenFR', async (req, res) => {
 
 app.post('/saveExpoPushToken', async (req, res) => {
     const { username, token } = req.body;
-
+   
     try {
+        if (!token) {
+            return res.status(400).json({ message: 'Invalid token' });
+        }
+
         const user = await User.findOne({ username: username });
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        // Filter out any null values from the expoPushTokens array
+        user.expoPushTokens = user.expoPushTokens.filter(t => t != null);
+
         // Push the new token to the expoPushTokens array if it doesn't already exist
-        if (user.expoPushTokens.indexOf(token) === -1) {
+        if (!user.expoPushTokens.includes(token)) {
             user.expoPushTokens.push(token);
-            console.log("token",token);
+            console.log("Token", token);
             await user.save();
             res.status(200).json({ message: 'Token saved successfully' });
         } else {
@@ -1062,6 +1151,87 @@ app.post('/saveExpoPushToken', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+const openAIKey = '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'; // Securely store this
+
+app.post('/api/process-text', async (req, res) => {
+    const { text } = req.body;
+
+    try {
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: "gpt-4", // or gpt-4, depending on your needs
+            prompt: text,
+            max_tokens: 150, // Adjust based on how much generated content you want
+            temperature: 0.7, // Adjust for creativity. Lower is more deterministic.
+        }, {
+            headers: {
+                'Authorization': `Bearer ${openAIKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        res.json({ response: response.data.choices[0].text });
+    } catch (error) {
+        console.error('OpenAI Error Response:', error.response?.data || error.message);
+        res.status(500).send('Error processing text with OpenAI');
+    }
+    
+});
+
+
+// Check if username is unique
+app.get('/checkUsername/:username', async (req, res) => {
+    const { username } = req.params;
+    try {
+        const user = await User.findOne({ username });
+        if (user) {
+            return res.status(200).json({ unique: false });
+        }
+        return res.status(200).json({ unique: true });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Check if email is unique
+app.get('/checkEmail/:email', async (req, res) => {
+    const { email } = req.params;
+    try {
+        const user = await User.findOne({ email });
+        if (user) {
+            return res.status(200).json({ unique: false });
+        }
+        return res.status(200).json({ unique: true });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+
+app.post('/message', async (req, res) => {
+    const userMessage = req.body.message;
+
+    // The text query request.
+    const request = {
+        session: sessionPath,
+        queryInput: {
+            text: {
+                text: userMessage,
+                languageCode: 'en-US',
+            },
+        },
+    };
+
+    try {
+        const responses = await sessionClient.detectIntent(request);
+        const result = responses[0].queryResult;
+        res.json({ reply: result.fulfillmentText });
+    } catch (error) {
+        console.error('Dialogflow API error:', error);
+        res.status(500).send('Error processing the message');
+    }
+});
+
+
 
 app.post('/api/order/add', async (req, res) => {
     try {
@@ -1096,6 +1266,18 @@ app.post('/api/order/add', async (req, res) => {
     }
   });
 
+
+  app.get('/api/order/item/myId', async (req, res) => {
+    try {
+        const myId = req.query.myId;
+      const items = await OrderItem.find({token:myId});
+      res.status(200).json(items);
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Error retrieving order items');
+    }
+  });
+
 app.post('/login', async (req, res) => {
     console.log("Received login request:", req.body);  // Debugging line
 
@@ -1114,6 +1296,7 @@ app.post('/login', async (req, res) => {
         const token = jwt.sign({ id: user._id }, SECRET_KEY);
         if (req.body.expoPushToken) {
             user.expoPushTokens = req.body.expoPushTokens;
+
             await user.save();
         }
         return res.json({
@@ -1240,8 +1423,26 @@ app.get('/search', async (req, res) => {
     }
 });
 
+app.get('/notifications/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const notifications = await Notification.find({ userId }).sort({ createdAt: -1 });
+        res.json(notifications);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
-
+// Mark a notification as read
+app.post('/notifications/:notificationId/markAsRead', async (req, res) => {
+    try {
+        const notificationId = req.params.notificationId;
+        await Notification.findByIdAndUpdate(notificationId, { read: true });
+        res.status(200).json({ message: 'Notification marked as read' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
 
 app.post('/save-token', async (req, res) => {
@@ -1274,18 +1475,32 @@ app.put('/update', async (req, res) => {
         return;
     }
 
+    // Destructure and validate all required fields
     const { userId, field, newValue } = req.body;
-    console.log("Received userId:", userId);
-    console.log("Updating field:", field, "with value:", newValue);
-    try {
-        const userExists = await User.findOne({ _id: userId }); // changed from userId to default _id
-        if (!userExists) {
-            console.error("Update error: User not found");
-            res.status(404).send({ error: "User not found" });
-            return;
-        }
+    if (!userId || !field || newValue === undefined) {
+        console.error("Update error: Missing required fields");
+        res.status(400).send({ error: "Missing required fields" });
+        return;
+    }
 
-        const updatedUser = await User.findByIdAndUpdate(userId, { [field]: newValue }, { new: true }); // used findByIdAndUpdate
+    // Normalize the field name for username updates
+    let normalizedField = field;
+    if (field && field.toLowerCase() === 'username') { // Check if field is defined before calling toLowerCase()
+        normalizedField = 'username';
+    } else if (field) {
+        // Normalize other fields if necessary
+        normalizedField = field.toLowerCase();
+    }
+
+    console.log("Received userId:", userId);
+    console.log("Updating field:", normalizedField, "with value:", newValue);
+
+    try {
+        const updatedUser = await User.findByIdAndUpdate(
+            userId, 
+            { [normalizedField]: newValue }, 
+            { new: true }
+        );
 
         if (!updatedUser) {
             console.error("Update error: Failed to update user");
@@ -1293,12 +1508,36 @@ app.put('/update', async (req, res) => {
             return;
         }
 
+        console.log("Updated user:", updatedUser);
         res.status(200).json(updatedUser);
     } catch (error) {
         console.error("Update error:", error);
         res.status(500).send({ error: "Failed to update profile" });
     }
 });
+
+
+// Endpoint to fetch user details by ID
+app.get('/user/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await User.findById(userId);
+  
+      if (!user) {
+        return res.status(404).send({ message: 'User not found' });
+      }
+  
+      res.json({
+        username: user.username,
+        email: user.email,
+        // return other fields as necessary
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).send({ message: 'Server error while fetching user details' });
+    }
+  });
+
 
 app.get('/getExpoPushTokens', async (req, res) => {
     const { username } = req.query;
@@ -1411,13 +1650,14 @@ app.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
-        //const expoPushTokens = Array.isArray(req.body.expoPushTokens) ? req.body.expoPushTokens : [req.body.expoPushTokens];
+        const expoPushTokens = Array.isArray(req.body.expoPushTokens) ? req.body.expoPushTokens : [req.body.expoPushTokens];
 
         // Create a new user
         user = new User({
             username: req.body.username,
             email: req.body.email,  // Add this line
             password: hashedPassword,
+            expoPushTokens:expoPushTokens
            
             // ... other fields
         });
@@ -1434,6 +1674,61 @@ app.post('/register', async (req, res) => {
 
 
 
+
+
+app.post('/resend-verification-code', async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    try {
+        // Find the verification record
+        let verification = await Verification.findOne({ email: email.trim() });
+
+        if (!verification) {
+            // If no verification record exists, respond accordingly
+            return res.status(404).json({ success: false, message: 'Verification record not found' });
+        }
+
+        // Generate a new OTP code
+        const verificationCode = Math.floor(Math.random() * 9000) + 1000;  // 4-digit code
+        verification.verificationCode = verificationCode;
+        verification.expiresAt = new Date(Date.now() + 3600000);  // Code expires in 1 hour
+        await verification.save();
+
+        // Email sending logic remains the same
+        let verificationCodeText = `Your Verification code is: ${verificationCode}`;
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: 'foodieshub53@gmail.com',
+                pass: 'vfgd lxmu dnpi hwuf'
+            }
+        });
+
+        const mailOptions = {
+            from: 'foodieshub53@gmail.com',
+            to: email,
+            subject: 'Resend Verification Code',
+            text: verificationCodeText
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.log('Error occurred:', error);
+                return res.status(500).json({ success: false, message: 'Failed to send email' });
+            } else {
+                console.log(`Verification code resent to ${email}:`, info.response);
+                return res.status(200).json({ success: true, message: 'OTP sent successfully.' });
+            }
+        });
+    } catch (error) {
+        console.error("Database error:", error);
+        return res.status(500).json({ success: false, message: 'Database error' });
+    }
+});
 
 
 
@@ -1555,6 +1850,79 @@ app.post('/reset-password', async (req, res) => {
         }
     });
 });
+app.post('/verify-email', async (req, res) => {
+    console.log("Received email for reset:", req.body.email);
+    const { email } = req.body;
+
+    const verificationCode = Math.floor(Math.random() * 9000) + 1000; // 4-digit code
+    const expiresAt = new Date(Date.now() + 3600000); // Code expires in 1 hour
+
+    let VerificationCodeText = `Your verification code is: ${verificationCode}`;
+
+    try {
+        // Create a new verification record
+        const verification = new Verification({ email: email.trim(), verificationCode, expiresAt });
+        await verification.save();
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'foodieshub53@gmail.com',
+            pass: 'vfgd lxmu dnpi hwuf'
+        }
+    });
+
+    const mailOptions = {
+        from: 'foodieshub53@gmail.com',
+        to: email,
+        subject: 'Email Verification Code',
+        text: VerificationCodeText
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.log('Error occurred:', error);
+            return res.status(500).json({ success: false, message: 'Failed to send email' });
+        } else {
+            console.log(`Email sent to ${email}:`, info.response);
+            
+            // You might want to save the code and email to a temporary store
+            // if you need to validate it later
+            return res.status(200).json({ success: true, message: 'Email sent' });
+        }
+    });
+} catch (error) {
+    if (error.code === 11000) { // Duplicate key error
+        return res.status(400).json({ success: false, message: 'A verification code has already been sent to this email' });
+    }
+    console.error('Database error:', error);
+    return res.status(500).json({ success: false, message: 'Database error' });
+}
+});
+
+app.post('/verify-verification-code', async (req, res) => {
+    const { email, code } = req.body;
+
+    // Find the verification record for the given email
+    const verification = await Verification.findOne({ email: email.trim() });
+
+    if (!verification) {
+        return res.status(404).json({ success: false, message: 'Email not found' });
+    }
+
+    if (Date.now() > verification.expiresAt) {
+        return res.status(400).json({ success: false, message: 'Verification code has expired' });
+    }
+
+    if (verification.verificationCode !== code) {
+        return res.status(400).json({ success: false, message: 'Invalid verification code' });
+    }
+
+    // Optionally, you can delete the verification record after successful verification
+    await Verification.deleteOne({ email: email.trim() });
+
+    res.json({ success: true, message: 'Code verified successfully' });
+});
+
 
   app.post('/verify-reset-code', async (req, res) => {
     const { email, code } = req.body;
@@ -1648,6 +2016,65 @@ app.delete('/review/:id', async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+
+app.post('/triggerNotification', async (req, res) => {
+    const { title, body, data, recipientEmail } = req.body;
+
+    try {
+        // Find the user by email
+        const user = await User.findOne({ email: recipientEmail });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        // Ensure the 'body' field is provided
+        if (!body) {
+            return res.status(400).json({ success: false, message: 'Message body is required.' });
+        }
+
+        // Create and save the notification
+        const newNotification = new Notification({
+            userId: user._id,
+            title,
+            message: body, // Ensure this maps to your Notification schema's field
+            data,
+            read: false,
+            createdAt: new Date()
+        });
+        await newNotification.save();
+
+        // Code to send push notifications (if needed)
+        // ...
+
+        res.status(200).json({ success: true, message: 'Notification created successfully.' });
+    } catch (error) {
+        console.error("Error in /triggerNotification: ", error);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+
+// DELETE endpoint to remove a notification
+app.delete('/notifications/remove/:notificationId', async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        
+        // Find and remove the notification by ID
+        const result = await Notification.findByIdAndRemove(notificationId);
+
+        if (!result) {
+            return res.status(404).send('The notification with the given ID was not found.');
+        }
+
+        res.send(result);
+    } catch (error) {
+        console.error('Error removing notification:', error);
+        res.status(500).send('Error removing notification.');
+    }
+});
+
+
+
 
 app.post('/send-notification', async (req, res) => {
     const { title, body, data, recipientEmail } = req.body;
